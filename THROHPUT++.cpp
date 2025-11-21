@@ -9,8 +9,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
-
-
+#include <stdexcept>
 
 // =======================================================================
 //
@@ -448,6 +447,14 @@ namespace vapor_sodium {
 #pragma endregion
 
 
+// =======================================================================
+//
+//                        [SOLVING FUNCTIONS]
+//
+// =======================================================================
+
+constexpr int B = 11;  // dimensione blocco
+
 double L(double mu) {
     return (2.0 - (mu * mu + 2.0) * std::sqrt(1.0 - mu * mu)) / (mu * mu * mu);
 }
@@ -483,6 +490,235 @@ double surf_ten(double T) {
 inline int H(double x) {
     return x > 0.0 ? 1 : 0;
 }
+
+struct SparseBlock {
+    std::vector<int> row;
+    std::vector<int> col;
+    std::vector<double> val;
+};
+
+using DenseBlock = std::array<std::array<double, B>, B>;
+using VecBlock = std::array<double, B>;
+
+// ------------------------- Utility dense -------------------------
+
+DenseBlock to_dense(const SparseBlock& S) {
+    DenseBlock M{};
+    for (std::size_t k = 0; k < S.val.size(); ++k) {
+        int i = S.row[k];
+        int j = S.col[k];
+        M[i][j] = S.val[k];
+    }
+    return M;
+}
+
+void matvec(const DenseBlock& A, const double x[B], double y[B]) {
+    for (int i = 0; i < B; ++i) {
+        double s = 0.0;
+        for (int j = 0; j < B; ++j)
+            s += A[i][j] * x[j];
+        y[i] = s;
+    }
+}
+
+void matmul(const DenseBlock& A, const DenseBlock& Bm, DenseBlock& C) {
+    for (int i = 0; i < B; ++i)
+        for (int j = 0; j < B; ++j) {
+            double s = 0.0;
+            for (int k = 0; k < B; ++k)
+                s += A[i][k] * Bm[k][j];
+            C[i][j] = s;
+        }
+}
+
+void subtract_inplace(DenseBlock& A, const DenseBlock& Bm) {
+    for (int i = 0; i < B; ++i)
+        for (int j = 0; j < B; ++j)
+            A[i][j] -= Bm[i][j];
+}
+
+// ------------------------- LU con pivoting -------------------------
+
+void lu_factor(DenseBlock& A, std::array<int, B>& piv) {
+    for (int i = 0; i < B; ++i)
+        piv[i] = i;
+
+    for (int k = 0; k < B; ++k) {
+        // pivot
+        int p = k;
+        double maxv = std::fabs(A[k][k]);
+        for (int i = k + 1; i < B; ++i) {
+            double v = std::fabs(A[i][k]);
+            if (v > maxv) {
+                maxv = v;
+                p = i;
+            }
+        }
+        if (maxv == 0.0)
+            throw std::runtime_error("LU: matrice singolare");
+
+        if (p != k) {
+            std::swap(piv[k], piv[p]);
+            for (int j = 0; j < B; ++j)
+                std::swap(A[k][j], A[p][j]);
+        }
+
+        // eliminazione
+        for (int i = k + 1; i < B; ++i) {
+            A[i][k] /= A[k][k];
+            double lik = A[i][k];
+            for (int j = k + 1; j < B; ++j)
+                A[i][j] -= lik * A[k][j];
+        }
+    }
+}
+
+void lu_solve_vec(const DenseBlock& LU, const std::array<int, B>& piv,
+    const double b_in[B], double x[B]) {
+    // applica pivot a b
+    double y[B];
+    for (int i = 0; i < B; ++i)
+        y[i] = b_in[piv[i]];
+
+    // Ly = Pb (forward)
+    for (int i = 0; i < B; ++i) {
+        for (int j = 0; j < i; ++j)
+            y[i] -= LU[i][j] * y[j];
+    }
+
+    // Ux = y (backward)
+    for (int i = B - 1; i >= 0; --i) {
+        for (int j = i + 1; j < B; ++j)
+            y[i] -= LU[i][j] * x[j];
+        x[i] = y[i] / LU[i][i];
+    }
+}
+
+void lu_solve_mat(const DenseBlock& LU, const std::array<int, B>& piv,
+    const DenseBlock& Bm, DenseBlock& X) {
+    // risolve LU X = P B (colonna per colonna)
+    for (int col = 0; col < B; ++col) {
+        double b_col[B];
+        double x_col[B];
+
+        for (int i = 0; i < B; ++i)
+            b_col[i] = Bm[i][col];
+
+        lu_solve_vec(LU, piv, b_col, x_col);
+
+        for (int i = 0; i < B; ++i)
+            X[i][col] = x_col[i];
+    }
+}
+
+// ------------------------- Solve block-tridiagonal -------------------------
+
+// L[i]: blocco sinistro (i>=1)
+// D[i]: blocco diagonale
+// R[i]: blocco destro (i<=Nx-2)
+// Q[i]: termini noti di blocco (dimensione B)
+// X[i]: soluzione per blocco i
+void solve_block_tridiag(
+    const std::vector<SparseBlock>& L,
+    const std::vector<SparseBlock>& D,
+    const std::vector<SparseBlock>& R,
+    const std::vector<VecBlock>& Q,
+    std::vector<VecBlock>& X) {
+    const int Nx = static_cast<int>(D.size());
+    if (Nx == 0)
+        return;
+
+    // copia dense dei blocchi
+    std::vector<DenseBlock> Dd(Nx);
+    std::vector<DenseBlock> Ld(Nx);
+    std::vector<DenseBlock> Rd(Nx);
+
+    for (int i = 0; i < Nx; ++i) {
+        Dd[i] = to_dense(D[i]);
+        if (i > 0)     Ld[i] = to_dense(L[i]);
+        if (i < Nx - 1)  Rd[i] = to_dense(R[i]);
+    }
+
+    std::vector<VecBlock> Qm = Q;             // Q modificato durante forward
+    X.assign(Nx, VecBlock{});                 // soluzione
+
+    std::vector<std::array<int, B>> piv(Nx);
+    std::vector<bool> factored(Nx, false);
+
+    // -------- Forward elimination --------
+    for (int i = 1; i < Nx; ++i) {
+        int im1 = i - 1;
+
+        if (!factored[im1]) {
+            lu_factor(Dd[im1], piv[im1]);
+            factored[im1] = true;
+        }
+
+        // Solve D[im1] * Xtemp = R[im1]
+        DenseBlock Xtemp;
+        lu_solve_mat(Dd[im1], piv[im1], Rd[im1], Xtemp);
+
+        // D[i] = D[i] - L[i] * Xtemp
+        DenseBlock L_X;
+        matmul(Ld[i], Xtemp, L_X);
+        subtract_inplace(Dd[i], L_X);
+
+        // Solve D[im1] * y = Qm[im1]
+        double y[B], q_prev[B];
+        for (int k = 0; k < B; ++k)
+            q_prev[k] = Qm[im1][k];
+        lu_solve_vec(Dd[im1], piv[im1], q_prev, y);
+
+        // Qm[i] = Qm[i] - L[i] * y
+        double Ly[B];
+        matvec(Ld[i], y, Ly);
+        for (int k = 0; k < B; ++k)
+            Qm[i][k] -= Ly[k];
+    }
+
+    // -------- Backward substitution --------
+
+    // ultimo blocco
+    if (!factored[Nx - 1]) {
+        lu_factor(Dd[Nx - 1], piv[Nx - 1]);
+        factored[Nx - 1] = true;
+    }
+    {
+        double rhs[B];
+        double sol[B];
+        for (int k = 0; k < B; ++k)
+            rhs[k] = Qm[Nx - 1][k];
+        lu_solve_vec(Dd[Nx - 1], piv[Nx - 1], rhs, sol);
+        for (int k = 0; k < B; ++k)
+            X[Nx - 1][k] = sol[k];
+    }
+
+    // blocchi precedenti
+    for (int i = Nx - 2; i >= 0; --i) {
+        if (!factored[i]) {
+            lu_factor(Dd[i], piv[i]);
+            factored[i] = true;
+        }
+
+        double RX[B];
+        matvec(Rd[i], X[i + 1].data(), RX);
+
+        double rhs[B];
+        for (int k = 0; k < B; ++k)
+            rhs[k] = Qm[i][k] - RX[k];
+
+        double sol[B];
+        lu_solve_vec(Dd[i], piv[i], rhs, sol);
+        for (int k = 0; k < B; ++k)
+            X[i][k] = sol[k];
+    }
+}
+
+auto add = [&](SparseBlock& B, int p, int q, double v) {
+    B.row.push_back(p);
+    B.col.push_back(q);
+    B.val.push_back(v);
+    };
 
 int main() {
 
@@ -639,23 +875,8 @@ int main() {
 
     std::vector<double> Gamma_xv(N, 0.0);
 
-    const int B = 11;
-    struct SparseBlock {
-        std::vector<int> row;
-        std::vector<int> col;
-        std::vector<double> val;
-    };
-
-    SparseBlock Diag_i, Left_i, Right_i;
-
-    auto add = [&](SparseBlock& B, int p, int q, double v) {
-        B.row.push_back(p);
-        B.col.push_back(q);
-        B.val.push_back(v);
-        };
-
-    using VecBlock = std::array<double, B>;
-    VecBlock Q_i{};
+    std::vector<SparseBlock> L(N), D(N), R(N);
+    std::vector<VecBlock> Q(N), X;
 
     for(int i = 0; i < N; ++i){
 
@@ -820,24 +1041,24 @@ int main() {
         }
 
         // Mass mixture equation
-        add(Diag_i, 0, 0,
+        add(D[i], 0, 0,
             alpha_m[i] / dt
             + (alpha_m[i] * v_m[i] * H(v_m[i])
             - alpha_m[i - 1] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz
             - C39);
 
-        add(Diag_i, 0, 2,
+        add(D[i], 0, 2,
             rho_m[i] / dt
             + (rho_m[i] * v_m[i] * H(v_m[i])
             - rho_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz);
 
-        add(Diag_i, 0, 6,
+        add(D[i], 0, 6,
             (alpha_m[i] * rho_m[i] * H(v_m[i])
             + alpha_m[i + 1] * rho_m[i + 1] * (1 - H(v_m[i]))) / dz);
 
-        add(Diag_i, 0, 8, -C38);
-        add(Diag_i, 0, 9, -C36);
-        add(Diag_i, 0, 10, -C37);
+        add(D[i], 0, 8, -C38);
+        add(D[i], 0, 9, -C36);
+        add(D[i], 0, 10, -C37);
 
 
         Q_i[0] = C40  
@@ -847,43 +1068,43 @@ int main() {
                             - alpha_m[i] * rho_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz
                     + 2 * (rho_m[i] * alpha_m[i]) / dt;
 
-        add(Left_i, 0, 2,
+        add(L[i], 0, 2,
             -(rho_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz);
 
-        add(Left_i, 0, 4,
+        add(L[i], 0, 4,
             -(alpha_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz);
 
-        add(Left_i, 0, 6,
+        add(L[i], 0, 6,
             -(alpha_m[i - 1] * rho_m[i - 1] * H(v_m[i - 1])
             + alpha_m[i] * rho_m[i] * (1 - H(v_m[i - 1]))) / dz);
 
-        add(Right_i, 0, 0,
+        add(R[i], 0, 0,
             (alpha_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz);
 
-        add(Right_i, 0, 2,
+        add(R[i], 0, 2,
             (rho_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz);
 
         // Mass liquid equation
 
-        add(Diag_i, 1, 0, +C39);
+        add(D[i], 1, 0, +C39);
 
-        add(Diag_i, 1, 1,
+        add(D[i], 1, 1,
             alpha_l[i] / dt
             + (alpha_l[i] * v_l[i] * H(v_l[i])
             - alpha_l[i - 1] * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz);
 
-        add(Diag_i, 1, 3,
+        add(D[i], 1, 3,
             rho_l[i] / dt
             + (rho_l[i] * v_l[i] * H(v_l[i])
             - rho_l[i] * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz);
 
-        add(Diag_i, 1, 7,
+        add(D[i], 1, 7,
             (alpha_l[i] * rho_l[i] * H(v_l[i])
             + alpha_l[i + 1] * rho_l[i + 1] * (1 - H(v_l[i]))) / dz);
 
-        add(Diag_i, 1, 8, +C38);
-        add(Diag_i, 1, 9, +C36);
-        add(Diag_i, 1, 10, +C37);
+        add(D[i], 1, 8, +C38);
+        add(D[i], 1, 9, +C36);
+        add(D[i], 1, 10, +C37);
 
 
         Q_i[1] = -C40
@@ -893,54 +1114,59 @@ int main() {
                 - alpha_l[i] * rho_l[i] * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz
             + 2 * (rho_l[i] * alpha_l[i]) / dt;
 
-        add(Left_i, 1, 3,
+        add(L[i], 1, 3,
             -(rho_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz);
 
-        add(Left_i, 1, 5,
+        add(L[i], 1, 5,
             -(alpha_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz);
 
-        add(Left_i, 1, 7,
+        add(L[i], 1, 7,
             -(alpha_l[i - 1] * rho_l[i - 1] * H(v_l[i - 1])
             + alpha_l[i] * rho_l[i] * (1 - H(v_l[i - 1]))) / dz);
 
-        add(Right_i, 1, 1,
+        add(R[i], 1, 1,
             (alpha_l[i + 1] * v_l[i] * (1 - H(v_l[i]))) / dz);
 
-        add(Right_i, 1, 3,
+        add(R[i], 1, 3,
             (rho_l[i + 1] * v_l[i] * (1 - H(v_l[i]))) / dz);
 
         // Mixture heat equation
 
-        const double cp_m_p, cp_m_l, cp_m_r;
-        const double k_m_p, k_m_l, k_m_r;
+        const double cp_m_p = vapor_sodium::cp(T_m[i]);
+        const double cp_m_l = vapor_sodium::cp(T_m[i - 1]);
+        const double cp_m_r = vapor_sodium::cp(T_m[i + 1]);
 
-        add(Diag_i, 2, 0,
+        const double k_m_p = vapor_sodium::k(T_m[i], p_m[i]);
+        const double k_m_l = vapor_sodium::k(T_m[i - 1], p_m[i - 1]);
+        const double k_m_r = vapor_sodium::k(T_m[i + 1], p_m[i + 1]);
+
+        add(D[i], 2, 0,
             (alpha_m[i] * T_m[i] * cp_m_p) / dt
             + (alpha_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i])) / dz
             - (alpha_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1]))) / dz
             + p_m[i] / dt
             - C45 - h_xv_v * C39);
 
-        add(Diag_i, 2, 2,
+        add(D[i], 2, 2,
             (T_m[i] * rho_m[i] * cp_m_p) / dt
             + (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i])) / dz
             - (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1]))) / dz
             + p_m[i] * (v_m[i] * H(v_m[i]) + v_m[i - 1] * H(v_m[i - 1])) / dz);
 
-        add(Diag_i, 2, 6,
+        add(D[i], 2, 6,
             (T_m[i] * cp_m_p* alpha_m[i] * rho_m[i]) / dt
             + (alpha_m[i] * rho_m[i] * cp_m_p * T_m[i] * H(v_m[i]) + alpha_m[i + 1] * rho_m[i + 1] * cp_m_r * T_m[i + 1] * (1 - H(v_m[i]))) / dz
             + p_m[i] * (alpha_m[i] * H(v_m[i]) + alpha_m[i + 1] * (1 - H(v_m[i]))) / dz);
 
-        add(Diag_i, 2, 8,
+        add(D[i], 2, 8,
             + (alpha_m[i] * rho_m[i] * cp_m_p * v_m[i] * H(v_m[i])) / dz
             - (alpha_m[i] * rho_m[i] * cp_m_p * v_m[i] * (1 - H(v_m[i - 1]))) / dz
             + (alpha_m[i] * k_m_p * H(v_m[i]) + alpha_m[i + 1] * k_m_r * (1 - H(v_m[i]))) / (dz * dz)
             + (alpha_m[i - 1] * k_m_l * H(v_m[i - 1]) + alpha_m[i] * k_m_p * (1 - H(v_m[i - 1]))) / (dz * dz)
             - C44 - h_xv_v * C38);
 
-        add(Diag_i, 2, 9, - C42 - h_vx_x * C36);
-        add(Diag_i, 2, 10, -C43 - h_xv_v * C37);
+        add(D[i], 2, 9, - C42 - h_vx_x * C36);
+        add(D[i], 2, 10, -C43 - h_xv_v * C37);
 
         Q_i[2] = 3 * (alpha_m[i] * T_m[i] * rho_m[i]) / dt 
             + 3 * ( 
@@ -958,14 +1184,14 @@ int main() {
             + p_m[i] * alpha_m[i] / dt
             + C46 + h_xv_v * C40;
 
-        add(Left_i, 2, 0,
+        add(L[i], 2, 0,
             -(alpha_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz);
 
-        add(Left_i, 2, 2,
+        add(L[i], 2, 2,
             (rho_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz
             + p_m[i] * (v_m[i - 1] * H(v_m[i - 1])) / dz);
 
-        add(Left_i, 2, 6,
+        add(L[i], 2, 6,
             -(
                 + alpha_m[i - 1] * rho_m[i - 1] * cp_m_l * T_m[i - 1] * H(v_m[i - 1]) 
                 + alpha_m[i] * rho_m[i] * cp_m_l * T_m[i] * (1 - H(v_m[i - 1]))
@@ -975,62 +1201,67 @@ int main() {
                 + alpha_m[i] * (1 - H(v_m[i - 1]))
                 ) / dz);
 
-        add(Left_i, 2, 8,
+        add(L[i], 2, 8,
             -(alpha_m[i - 1] * rho_m[i - 1] * cp_m_l * v_m[i - 1] * H(v_m[i - 1])) / dz
             - (alpha_m[i - 1] * k_m_l * H(v_m[i - 1]) + alpha_m[i] * k_m_p * (1 - H(v_m[i - 1]))) / (dz * dz));
 
 
-        add(Right_i, 2, 0,
+        add(R[i], 2, 0,
             (alpha_m[i + 1] * cp_m_r * T_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz);
 
-        add(Right_i, 2, 2,
+        add(R[i], 2, 2,
             (rho_m[i + 1] * cp_m_r * T_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz
             + p_m[i] * (v_m[i] * (1 - H(v_m[i]))) / dz);
 
-        add(Right_i, 2, 8,
+        add(R[i], 2, 8,
             (alpha_m[i + 1] * rho_m[i + 1] * cp_m_r * v_m[i] * (1 - H(v_m[i]))) / dz
             - (alpha_m[i] * k_m_p * H(v_m[i]) + alpha_m[i + 1] * k_m_r * (1 - H(v_m[i]))) / (dz * dz));
 
         // Heat liquid equation
 
-        const double cp_l_p, cp_l_l, cp_l_r;
-        const double k_l_p, k_l_l, k_l_r;
+        const double cp_l_p = liquid_sodium::cp(T_l[i]);
+        const double cp_l_l = liquid_sodium::cp(T_l[i - 1]);
+        const double cp_l_r = liquid_sodium::cp(T_l[i + 1]);
 
-        add(Diag_i, 2, 0, );
+        const double k_l_p = liquid_sodium::k(T_l[i]);
+        const double k_l_l = liquid_sodium::k(T_l[i - 1]);
+        const double k_l_r = liquid_sodium::k(T_l[i + 1]);
 
-        add(Diag_i, 2, 1,
+        add(D[i], 2, 0, -C57 - h_xv_v * C39 - C51);
+
+        add(D[i], 2, 1,
             eps_v * 
                 (alpha_l[i] * T_l[i] * cp_l_p) / dt
                 + (alpha_l[i] * cp_l_p * T_l[i] * v_l[i] * H(v_l[i])) / dz
                 - (alpha_l[i] * cp_l_p * T_l[i] * v_l[i] * (1 - H(v_l[i - 1]))) / dz
                 + p_l[i] / dt);
 
-        add(Diag_i, 2, 3,
+        add(D[i], 2, 3,
             eps_v * (
                 T_l[i] * rho_l[i] * cp_l_p) / dt
                 + (rho_l[i] * cp_l_p * T_l[i] * v_l[i] * H(v_l[i])) / dz
                 - (rho_l[i] * cp_l_p * T_l[i] * v_l[i] * (1 - H(v_l[i - 1]))) / dz
                 + p_l[i] * (v_l[i] * H(v_l[i]) + v_l[i - 1] * H(v_l[i - 1])) / dz);
 
-        add(Diag_i, 2, 7, 
+        add(D[i], 2, 7, 
             eps_v* (
                 T_l[i] * cp_l_p * alpha_l[i] * rho_l[i]) / dt
                 + (alpha_l[i] * rho_l[i] * cp_l_p * T_l[i] * H(v_l[i]) + alpha_l[i + 1] * rho_l[i + 1] * cp_l_r * T_l[i + 1] * (1 - H(v_l[i]))) / dz
                 + p_l[i] * (alpha_l[i] * H(v_l[i]) + alpha_l[i + 1] * (1 - H(v_l[i]))) / dz);
 
-        add(Diag_i, 2, 8, 
+        add(D[i], 2, 8, 
             -C56 - h_vx_x * C38 - C50);
 
-        add(Diag_i, 2, 9,
+        add(D[i], 2, 9,
             eps_v * (
                 + alpha_l[i] * rho_l[i] * cp_l_p * v_l[i] * H(v_l[i])) / dz
                 - (alpha_l[i] * rho_l[i] * cp_l_p * v_l[i] * (1 - H(v_l[i - 1]))) / dz
                 + (alpha_l[i] * k_l_p * H(v_l[i]) + alpha_l[i + 1] * k_l_r * (1 - H(v_l[i]))) / (dz * dz)
                 + (alpha_l[i - 1] * k_l_l * H(v_l[i - 1]) + alpha_l[i] * k_l_p * (1 - H(v_l[i - 1]))) / (dz * dz)
-                - C44 - h_xv_v * C38)
-            - C54 - C48 - h_vx_x * C36;
+                - C44 - h_xv_v * C38
+            - C54 - C48 - h_vx_x * C36);
 
-        add(Diag_i, 2, 10, 
+        add(D[i], 2, 10, 
             -C55 - h_vx_x * C37 - C49);
 
         Q_i[2] = 
@@ -1051,16 +1282,16 @@ int main() {
                 + p_l[i] * alpha_l[i] / dt)
             + C52 + C58 + h_vx_x * C40;
 
-        add(Left_i, 2, 1,
+        add(L[i], 2, 1,
             eps_v * (
             -(alpha_l[i - 1] * cp_l_l * T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz));
 
-        add(Left_i, 2, 3,
+        add(L[i], 2, 3,
             eps_v * (
                 (rho_l[i - 1] * cp_l_l* T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz
                 + p_l[i] * (v_l[i - 1] * H(v_l[i - 1])) / dz));
 
-        add(Left_i, 2, 7,
+        add(L[i], 2, 7,
             eps_v * (
                 -(
                     +alpha_l[i - 1] * rho_l[i - 1] * cp_l_l * T_l[i - 1] * H(v_l[i - 1])
@@ -1071,40 +1302,49 @@ int main() {
                 + alpha_l[i] * (1 - H(v_l[i - 1]))
                 ) / dz));
 
-        add(Left_i, 2, 9,
+        add(L[i], 2, 9,
             eps_v * (
             -(alpha_l[i - 1] * rho_l[i - 1] * cp_l_l * v_l[i - 1] * H(v_l[i - 1])) / dz
             - (alpha_l[i - 1] * k_l_l * H(v_l[i - 1]) + alpha_l[i] * k_l_p * (1 - H(v_l[i - 1]))) / (dz * dz)));
 
-        add(Right_i, 2, 1,
+        add(R[i], 2, 1,
             eps_v * (
             (alpha_l[i + 1] * cp_l_r* T_l[i + 1] * v_l[i] * (1 - H(v_l[i]))) / dz));
 
-        add(Right_i, 2, 3,
+        add(R[i], 2, 3,
             eps_v * (
             (rho_l[i + 1] * cp_l_r* T_l[i + 1] * v_l[i] * (1 - H(v_l[i]))) / dz
             + p_l[i] * (v_l[i] * (1 - H(v_l[i]))) / dz));
 
-        add(Right_i, 2, 9,
+        add(R[i], 2, 9,
             eps_v * (
                 (alpha_l[i + 1] * rho_l[i + 1] * cp_l_r* v_l[i] * (1 - H(v_l[i]))) / dz
                 - (alpha_l[i] * k_l_p * H(v_l[i]) + alpha_l[i + 1] * k_l_r * (1 - H(v_l[i]))) / (dz * dz)));
 
         // Heat wall equation
 
-        const double rho_w_p, rho_w_l, rho_w_r;
-        const double cp_w_p, cp_w_l, cp_w_r;
-        const double k_w_p, k_w_l, k_w_r;
+        const double rho_w_p = steel::rho(T_w[i]);
+        const double rho_w_l = steel::rho(T_w[i - 1]);
+        const double rho_w_r = steel::rho(T_w[i + 1]);
+
+        const double cp_w_p = steel::rho(T_w[i]);
+        const double cp_w_l = steel::rho(T_w[i - 1]);
+        const double cp_w_r = steel::rho(T_w[i + 1]);
+
+        const double k_w_p = steel::rho(T_w[i]);
+        const double k_w_l = steel::rho(T_w[i - 1]);
+        const double k_w_r = steel::rho(T_w[i + 1]);
+
         const double k_w_lf = 0.5 * (k_w_l + k_w_p);
-        const double k_w_rf = 0.5 * (k_w_r + k_w_p;
+        const double k_w_rf = 0.5 * (k_w_r + k_w_p);
 
-        add(Diag_i, 4, 0, -C57 * C64 / C53);
+        add(D[i], 4, 0, -C57 * C64 / C53);
 
-        add(Diag_i, 4, 8, C56* C64 / C53);
+        add(D[i], 4, 8, C56* C64 / C53);
 
-        add(Diag_i, 4, 9, -C54 * C64 / C53);
+        add(D[i], 4, 9, -C54 * C64 / C53);
 
-        add(Diag_i, 4, 10,
+        add(D[i], 4, 10,
             (rho_w_p* cp_w_p) / dt
             - (C55 / C53) * C64
             + (k_w_lf + k_w_rf) / (dz * dz));
@@ -1114,127 +1354,127 @@ int main() {
             + (rho_w_p * cp_w_p * T_w[i]) / dt
             + C58 * C64 / C53;
 
-        add(Left_i, 4, 10,
+        add(L[i], 4, 10,
             -k_w_lf / (dz * dz));
 
-        add(Right_i, 4, 10,
+        add(R[i], 4, 10,
             -k_w_rf / (dz * dz));
 
         // Momentum mixture equation
 
-        Diag_i[5][0] = (alpha_m[i] * v_m[i]) / dt - (alpha_m[i] * v_m[i - 1]* v_m[i - 1]) / dz;
-        Diag_i[5][1] = 0;
-        Diag_i[5][2] = (v_m[i] * rho_m[i]) / dt - (rho_m[i] * v_m[i] * v_m[i]) / dz;
-        Diag_i[5][3] = 0;
-        Diag_i[5][4] = -alpha_m[i] / dz;
-        Diag_i[5][5] = 0;
-        Diag_i[5][6] = (alpha_m[i] * rho_m[i]) / dt + 
+        D[i][5][0] = (alpha_m[i] * v_m[i]) / dt - (alpha_m[i] * v_m[i - 1]* v_m[i - 1]) / dz;
+        D[i][5][1] = 0;
+        D[i][5][2] = (v_m[i] * rho_m[i]) / dt - (rho_m[i] * v_m[i] * v_m[i]) / dz;
+        D[i][5][3] = 0;
+        D[i][5][4] = -alpha_m[i] / dz;
+        D[i][5][5] = 0;
+        D[i][5][6] = (alpha_m[i] * rho_m[i]) / dt + 
                         2 * (alpha_m[i] * rho_m[i] * v_m[i]) / dz +
                         f_m * rho_m[i] * std::abs(v_m[i]) / (4 * r_v);
-        Diag_i[5][7] = 0;
-        Diag_i[5][8] = 0;
-        Diag_i[5][9] = 0;
-        Diag_i[5][10] = 0;
+        D[i][5][7] = 0;
+        D[i][5][8] = 0;
+        D[i][5][9] = 0;
+        D[i][5][10] = 0;
 
         Q_i[5] = 3 * (alpha_m[i] * rho_m[i] * v_m[i]) / dt 
                     + 3 * (alpha_m[i + 1] * rho_m[i + 1] * v_m[i] * v_m[i] - alpha_m[i] * rho_m[i] * v_m[i - 1] * v_m[i - 1]) / dz;
 
-        Left_i[5][0] = 0;
-        Left_i[5][1] = 0;
-        Left_i[5][2] = 0;
-        Left_i[5][3] = 0;
-        Left_i[5][4] = 0;
-        Left_i[5][5] = 0;
-        Left_i[5][6] = -2 * (alpha_m[i] * rho_m[i] * v_m[i - 1] * v_m[i - 1]) / dz;
-        Left_i[5][7] = 0;
-        Left_i[5][8] = 0;
-        Left_i[5][9] = 0;
-        Left_i[5][10] = 0;
+        L[i][5][0] = 0;
+        L[i][5][1] = 0;
+        L[i][5][2] = 0;
+        L[i][5][3] = 0;
+        L[i][5][4] = 0;
+        L[i][5][5] = 0;
+        L[i][5][6] = -2 * (alpha_m[i] * rho_m[i] * v_m[i - 1] * v_m[i - 1]) / dz;
+        L[i][5][7] = 0;
+        L[i][5][8] = 0;
+        L[i][5][9] = 0;
+        L[i][5][10] = 0;
 
-        Right_i[5][0] = (alpha_m[i + 1] * v_m[i] * v_m[i]) / dz;
-        Right_i[5][1] = 0;
-        Right_i[5][2] = (rho_m[i + 1] * v_m[i] * v_m[i]) / dz;
-        Right_i[5][3] = 0;
-        Right_i[5][4] = alpha_m[i] / dz;
-        Right_i[5][5] = 0;
-        Right_i[5][6] = 0;
-        Right_i[5][7] = 0;
-        Right_i[5][8] = 0;
-        Right_i[5][9] = 0;
-        Right_i[5][10] = 0;
+        R[i][5][0] = (alpha_m[i + 1] * v_m[i] * v_m[i]) / dz;
+        R[i][5][1] = 0;
+        R[i][5][2] = (rho_m[i + 1] * v_m[i] * v_m[i]) / dz;
+        R[i][5][3] = 0;
+        R[i][5][4] = alpha_m[i] / dz;
+        R[i][5][5] = 0;
+        R[i][5][6] = 0;
+        R[i][5][7] = 0;
+        R[i][5][8] = 0;
+        R[i][5][9] = 0;
+        R[i][5][10] = 0;
 
         // Momentum liquid equation
 
-        Diag_i[6][0] = 0;
-        Diag_i[6][1] = eps_v * (alpha_l[i] * v_l[i]) / dt -
+        D[i][6][0] = 0;
+        D[i][6][1] = eps_v * (alpha_l[i] * v_l[i]) / dt -
                         eps_v * (alpha_l[i] * v_l[i - 1] * v_l[i - 1]) / dz;
-        Diag_i[6][2] = 0;
-        Diag_i[6][3] = eps_v * (v_l[i] * rho_l[i]) / dt -
+        D[i][6][2] = 0;
+        D[i][6][3] = eps_v * (v_l[i] * rho_l[i]) / dt -
                         eps_v * (rho_l[i] * v_l[i - 1] * v_l[i - 1]) / dz -
                         DPcap / dz;
-        Diag_i[6][4] = 0;
-        Diag_i[6][5] = -alpha_l[i] / dz;
-        Diag_i[6][6] = eps_v * (alpha_l[i] * rho_l[i]) / dt +
+        D[i][6][4] = 0;
+        D[i][6][5] = -alpha_l[i] / dz;
+        D[i][6][6] = eps_v * (alpha_l[i] * rho_l[i]) / dt +
                         2 * eps_v * (alpha_l[i + 1] * rho_l[i + 1] * v_l[i]) / dz + 
                         8 * mu_l / (eps_v * (r_i - r_v) * (r_i - r_v));
-        Diag_i[6][7] = 0;
-        Diag_i[6][8] = 0;
-        Diag_i[6][9] = 0;
-        Diag_i[6][10] = 0;
+        D[i][6][7] = 0;
+        D[i][6][8] = 0;
+        D[i][6][9] = 0;
+        D[i][6][10] = 0;
 
         Q_i[6] = 3 * eps_v * (alpha_l[i] * rho_l[i] * v_l[i]) / dt +
                     3 * eps_v * (alpha_l[i + 1] * rho_l[i + 1] * v_l[i] * v_l[i] - alpha_l[i] * rho_l[i] * v_l[i - 1] * v_l[i - 1]) / dz;
 
-        Left_i[6][0] = 0;
-        Left_i[6][1] = 0;
-        Left_i[6][2] = 0;
-        Left_i[6][3] = 0;
-        Left_i[6][4] = 0;
-        Left_i[6][5] = 0;
-        Left_i[6][6] = -2 * eps_v * (alpha_l[i] * rho_l[i] * v_l[i - 1]);
-        Left_i[6][7] = 0;
-        Left_i[6][8] = 0;
-        Left_i[6][9] = 0;
-        Left_i[6][10] = 0;
+        L[i][6][0] = 0;
+        L[i][6][1] = 0;
+        L[i][6][2] = 0;
+        L[i][6][3] = 0;
+        L[i][6][4] = 0;
+        L[i][6][5] = 0;
+        L[i][6][6] = -2 * eps_v * (alpha_l[i] * rho_l[i] * v_l[i - 1]);
+        L[i][6][7] = 0;
+        L[i][6][8] = 0;
+        L[i][6][9] = 0;
+        L[i][6][10] = 0;
 
-        Right_i[6][0] = 0;
-        Right_i[6][1] = eps_v * (alpha_l[i + 1] * v_l[i] * v_l[i]) / dz;
-        Right_i[6][2] = 0;
-        Right_i[6][3] = eps_v * (rho_l[i + 1] * v_l[i] * v_l[i]) / dz +
+        R[i][6][0] = 0;
+        R[i][6][1] = eps_v * (alpha_l[i + 1] * v_l[i] * v_l[i]) / dz;
+        R[i][6][2] = 0;
+        R[i][6][3] = eps_v * (rho_l[i + 1] * v_l[i] * v_l[i]) / dz +
                         DPcap / dz;
-        Right_i[6][4] = 0;
-        Right_i[6][5] = alpha_l[i] / dz;
-        Right_i[6][6] = 0;
-        Right_i[6][7] = 0;
-        Right_i[6][8] = 0;
-        Right_i[6][9] = 0;
-        Right_i[6][10] = 0;
+        R[i][6][4] = 0;
+        R[i][6][5] = alpha_l[i] / dz;
+        R[i][6][6] = 0;
+        R[i][6][7] = 0;
+        R[i][6][8] = 0;
+        R[i][6][9] = 0;
+        R[i][6][10] = 0;
 
         // State mixture equation
 
-        add(Diag_i, 7, 0, -T_m[i] * Rv);
-        add(Diag_i, 7, 8, -rho_m[i] * Rv);
+        add(D[i], 7, 0, -T_m[i] * Rv);
+        add(D[i], 7, 8, -rho_m[i] * Rv);
 
         Q_i[7] = -rho_m[i] * T_m[i] * Rv;
 
         // State liquid equation
 
-        add(Diag_i, 8, 1, 1);
-        add(Diag_i, 8, 9, C62);
+        add(D[i], 8, 1, 1);
+        add(D[i], 8, 9, C62);
 
         Q_i[8] = C63;
 
         // Volume fraction sum
 
-        add(Diag_i, 9, 2, 1);
-        add(Diag_i, 9, 3, 1);
+        add(D[i], 9, 2, 1);
+        add(D[i], 9, 3, 1);
 
         Q_i[9] = 1;
 
         // Capillary equation
 
-        add(Diag_i, 10, 4, 1);
-        add(Diag_i, 10, 5, -1);
+        add(D[i], 10, 4, 1);
+        add(D[i], 10, 5, -1);
 
         Q_i[10] = DPcap;
     }
@@ -1320,5 +1560,7 @@ int main() {
     Q_last[8] = 0.0;
     Q_last[9] = 0.0;
     Q_last[10] = 0.0;
+
+    solve_block_tridiag(L, D, R, Q, X);
 
 }
