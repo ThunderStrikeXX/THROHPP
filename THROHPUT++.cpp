@@ -484,7 +484,6 @@ inline int H(double x) {
     return x > 0.0 ? 1 : 0;
 }
 
-
 int main() {
 
 #pragma region constants_and_variables
@@ -563,22 +562,10 @@ int main() {
     std::vector<double> T_x_v(N, T_full);
     std::vector<double> T_v_bulk(N, T_full);
 
-    // Wick BCs
-    const double u_inlet_x = 0.0;                                   ///< Wick inlet velocity [m/s]
-    const double u_outlet_x = 0.0;                                  ///< Wick outlet velocity [m/s]
-    double p_outlet_x = vapor_sodium::P_sat(T_x_v[N - 1]);          ///< Wick outlet pressure [Pa]
-
-    // Vapor BCs
-    const double u_inlet_v = 0.0;                                   ///< Vapor inlet velocity [m/s]
-    const double u_outlet_v = 0.0;                                  ///< Vapor outlet velocity [m/s]
-    double p_outlet_v = vapor_sodium::P_sat(T_v_bulk[N - 1]);       ///< Vapor outlet pressure [Pa]
-
     const double q_pp = power / (2 * M_PI * L * r_o);     ///< Heat flux at evaporator from given power [W/m^2]
 
     // Mass sources/fluxes
     std::vector<double> phi_x_v(N, 0.0);            ///< Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
-    std::vector<double> Gamma_xv_vapor(N, 0.0);     ///< Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
-    std::vector<double> Gamma_xv_wick(N, 0.0);      ///< Volumetric mass source [kg / (m^3 s)] (positive if evaporation)
 
     // Create result folder
     std::filesystem::create_directories("results");
@@ -652,13 +639,32 @@ int main() {
 
     std::vector<double> Gamma_xv(N, 0.0);
 
+    const int B = 11;
+    struct SparseBlock {
+        std::vector<int> row;
+        std::vector<int> col;
+        std::vector<double> val;
+    };
+
+    SparseBlock Diag_i, Left_i, Right_i;
+
+    auto add = [&](SparseBlock& B, int p, int q, double v) {
+        B.row.push_back(p);
+        B.col.push_back(q);
+        B.val.push_back(v);
+        };
+
+    using VecBlock = std::array<double, B>;
+    VecBlock Q_i{};
+
     for(int i = 0; i < N; ++i){
 
         const double k_w = steel::k(T_w_bulk[i]);                               ///< Wall thermal conductivity [W/(m K)]
         const double k_x = liquid_sodium::k(T_x_bulk[i]);                       ///< Liquid thermal conductivity [W/(m K)]
-        const double k_m = vapor_sodium::k(T_v_bulk[i], p_m[i]);           ///< Vapor thermal conductivity [W/(m K)]
-        const double cp_m = vapor_sodium::cp(T_v_bulk[i]);                      ///< Vapor specific heat [J/(kg K)]
+        const double k_m = vapor_sodium::k(T_m[i], p_m[i]);           ///< Vapor thermal conductivity [W/(m K)]
+        const double cp_m = vapor_sodium::cp(T_m[i]);                      ///< Vapor specific heat [J/(kg K)]
         const double mu_v = vapor_sodium::mu(T_v_bulk[i]);                      ///< Vapor dynamic viscosity [Pa*s]
+        const double mu_l = liquid_sodium::mu(T_x_bulk[i]);
         const double Dh_v = 2.0 * r_v;                                      ///< Hydraulic diameter of the vapor core [m]
         const double Re_v = rho_m[i] * std::fabs(v_m[i]) * Dh_v / mu_v;         ///< Reynolds number [-]
         const double Pr_v = cp_m * mu_v / k_m;                             ///< Prandtl number [-]
@@ -666,7 +672,7 @@ int main() {
         const double Psat = vapor_sodium::P_sat(T_x_v[i]);                      ///< Saturation pressure [Pa]         
         const double dPsat_dT = Psat * std::log(10.0) * (7740.0 / (T_x_v[i] * T_x_v[i]));   ///< Derivative of the saturation pressure wrt T [Pa/K]   
         const double beta = 1.0 / std::sqrt();
-        const double fac = (2.0 * r_v * eps_s * beta) / (r_w * r_w);    ///< Useful factor in the coefficients calculation [s / m^2]
+        const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);    ///< Useful factor in the coefficients calculation [s / m^2]
         const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));
 
         if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
@@ -813,255 +819,306 @@ int main() {
             }
         }
 
-        const int B = 11;
-        struct SparseBlock {
-            std::vector<int> row;
-            std::vector<int> col;
-            std::vector<double> val;
-        };
-
-        SparseBlock Diag_i, Left_i, Right_i;
-
-        auto add = [&](SparseBlock& B, int p, int q, double v) {
-            B.row.push_back(p);
-            B.col.push_back(q);
-            B.val.push_back(v);
-        };
-
-        using VecBlock = std::array<double, B>;
-        VecBlock Q_i{};
-
         // Mass mixture equation
-        Diag_i[0][0] = alpha_m[i] / dt 
-                        + (alpha_m[i] * v_m[i] * H(v_m[i])) - alpha_m[i - 1] * v_m[i - 1]) / dz - C39;
-        Diag_i[0][1] = 0;
-        Diag_i[0][2] = rho_m[i] / dt 
-                        + (rho_m[i] * v_m[i] * H(v_m[i])) / dz
-                        - (rho_m[i] * v_m[i] * (1 - H(v_m[i - 1]))) / dz;
-        Diag_i[0][3] = 0;
-        Diag_i[0][4] = 0;
-        Diag_i[0][5] = 0;
-        Diag_i[0][6] = (alpha_m[i] * rho_m[i] * H(v_m[i]) + alpha_m[i + 1] * rho_m[i + 1] * (1 - H(v_m[i]))) / dz;
-        Diag_i[0][7] = 0;
-        Diag_i[0][8] = -C38;
-        Diag_i[0][9] = -C36;
-        Diag_i[0][10] = -C37;
+        add(Diag_i, 0, 0,
+            alpha_m[i] / dt
+            + (alpha_m[i] * v_m[i] * H(v_m[i])
+            - alpha_m[i - 1] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz
+            - C39);
+
+        add(Diag_i, 0, 2,
+            rho_m[i] / dt
+            + (rho_m[i] * v_m[i] * H(v_m[i])
+            - rho_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz);
+
+        add(Diag_i, 0, 6,
+            (alpha_m[i] * rho_m[i] * H(v_m[i])
+            + alpha_m[i + 1] * rho_m[i + 1] * (1 - H(v_m[i]))) / dz);
+
+        add(Diag_i, 0, 8, -C38);
+        add(Diag_i, 0, 9, -C36);
+        add(Diag_i, 0, 10, -C37);
+
 
         Q_i[0] = C40  
-                    + 2 * ( - alpha_m[i] * rho_m[i] * v_m[i] * H(v_m[i])
-                            - alpha_m[i + 1] * rho_m[i + 1] * v_m[i] * (1 - H(v_m[i]))
-                            + alpha_m[i - 1] * rho_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])
-                            + alpha_m[i] * rho_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz
+                    + 2 * ( + alpha_m[i] * rho_m[i] * v_m[i] * H(v_m[i])
+                            + alpha_m[i + 1] * rho_m[i + 1] * v_m[i] * (1 - H(v_m[i]))
+                            - alpha_m[i - 1] * rho_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])
+                            - alpha_m[i] * rho_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz
                     + 2 * (rho_m[i] * alpha_m[i]) / dt;
 
-        Left_i[0][0] = 0;
-        Left_i[0][1] = 0;
-        Left_i[0][2] = 0;
-        Left_i[0][3] = 0;
-        Left_i[0][4] = 0;
-        Left_i[0][5] = 0;
-        Left_i[0][6] = -(alpha_m[i - 1] * rho_m[i - 1] * H(v_m[i - 1]) + alpha_m[i] * rho_m[i] * (1 - H(v_m[i - 1]))) / dz;
-        Left_i[0][7] = 0;
-        Left_i[0][8] = 0;
-        Left_i[0][9] = 0;
-        Left_i[0][10] = 0;
+        add(Left_i, 0, 2,
+            -(rho_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz);
 
-        Right_i[0][0] = (alpha_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz;
-        Right_i[0][1] = 0;
-        Right_i[0][2] = (rho_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz;
-        Right_i[0][3] = 0;
-        Right_i[0][4] = 0;
-        Right_i[0][5] = 0;
-        Right_i[0][6] = 0;
-        Right_i[0][7] = 0;
-        Right_i[0][8] = 0;
-        Right_i[0][9] = 0;
-        Right_i[0][10] = 0;
+        add(Left_i, 0, 4,
+            -(alpha_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz);
+
+        add(Left_i, 0, 6,
+            -(alpha_m[i - 1] * rho_m[i - 1] * H(v_m[i - 1])
+            + alpha_m[i] * rho_m[i] * (1 - H(v_m[i - 1]))) / dz);
+
+        add(Right_i, 0, 0,
+            (alpha_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz);
+
+        add(Right_i, 0, 2,
+            (rho_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz);
 
         // Mass liquid equation
 
-        Diag_i[1][0] = C39;
-        Diag_i[1][1] = eps_v * (alpha_l[i] / dt + (alpha_l[i] * v_l[i] - alpha_l[i - 1] * v_l[i - 1]) / dz);
-        Diag_i[1][2] = 0;
-        Diag_i[1][3] = eps_v * (rho_l[i] / dt + (rho_l[i] * v_l[i] - rho_l[i - 1] * v_l[i - 1]) / dz);
-        Diag_i[1][4] = 0;
-        Diag_i[1][5] = 0;
-        Diag_i[1][6] = 0;
-        Diag_i[1][7] = eps_v * (alpha_l[i] * rho_l[i]) / dz;
-        Diag_i[1][8] = C38;
-        Diag_i[1][9] = C36;
-        Diag_i[1][10] = C37;
+        add(Diag_i, 1, 0, +C39);
 
-        Q_i[1] = -C40 + 
-                    2 * eps_v * (alpha_l[i - 1] * rho_l[i - 1] * v_l[i - 1] - alpha_l[i] * rho_l[i] * v_l[i]) / dz +
-                    2 * rho_l[i] * alpha_l[i] / dt;
+        add(Diag_i, 1, 1,
+            alpha_l[i] / dt
+            + (alpha_l[i] * v_l[i] * H(v_l[i])
+            - alpha_l[i - 1] * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz);
 
-        Left_i[1][0] = 0;
-        Left_i[1][1] = 0;
-        Left_i[1][2] = 0;
-        Left_i[1][3] = 0;
-        Left_i[1][4] = 0;
-        Left_i[1][5] = 0;
-        Left_i[1][6] = 0;
-        Left_i[1][7] = - eps_v * (alpha_l[i - 1] * rho_l[i - 1]) / dz;
-        Left_i[1][8] = 0;
-        Left_i[1][9] = 0;
-        Left_i[1][10] = 0;
+        add(Diag_i, 1, 3,
+            rho_l[i] / dt
+            + (rho_l[i] * v_l[i] * H(v_l[i])
+            - rho_l[i] * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz);
 
-        Right_i[1][0] = 0;
-        Right_i[1][1] = 0;
-        Right_i[1][2] = 0;
-        Right_i[1][3] = 0;
-        Right_i[1][4] = 0;
-        Right_i[1][5] = 0;
-        Right_i[1][6] = 0;
-        Right_i[1][7] = 0;
-        Right_i[1][8] = 0;
-        Right_i[1][9] = 0;
-        Right_i[1][10] = 0;
+        add(Diag_i, 1, 7,
+            (alpha_l[i] * rho_l[i] * H(v_l[i])
+            + alpha_l[i + 1] * rho_l[i + 1] * (1 - H(v_l[i]))) / dz);
+
+        add(Diag_i, 1, 8, +C38);
+        add(Diag_i, 1, 9, +C36);
+        add(Diag_i, 1, 10, +C37);
+
+
+        Q_i[1] = -C40
+            + 2 * (+alpha_l[i] * rho_l[i] * v_l[i] * H(v_l[i])
+                + alpha_l[i + 1] * rho_l[i + 1] * v_l[i] * (1 - H(v_l[i]))
+                - alpha_l[i - 1] * rho_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])
+                - alpha_l[i] * rho_l[i] * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz
+            + 2 * (rho_l[i] * alpha_l[i]) / dt;
+
+        add(Left_i, 1, 3,
+            -(rho_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz);
+
+        add(Left_i, 1, 5,
+            -(alpha_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz);
+
+        add(Left_i, 1, 7,
+            -(alpha_l[i - 1] * rho_l[i - 1] * H(v_l[i - 1])
+            + alpha_l[i] * rho_l[i] * (1 - H(v_l[i - 1]))) / dz);
+
+        add(Right_i, 1, 1,
+            (alpha_l[i + 1] * v_l[i] * (1 - H(v_l[i]))) / dz);
+
+        add(Right_i, 1, 3,
+            (rho_l[i + 1] * v_l[i] * (1 - H(v_l[i]))) / dz);
 
         // Mixture heat equation
 
-        Diag_i[2][0] = (alpha_m[i] * T_m[i] * cp_m) / dt + 
-                        cp_m * (T_m[i] * alpha_m[i] * v_m[i] - T_m[i - 1] * alpha_m[i - 1] * v_m[i - 1]) / dz - 
-                        C45 - h_xv_v * C39;
-        Diag_i[2][1] = 0;
-        Diag_i[2][2] = (T_m[i] * rho_m[i] * cp_m) / dt + p_m[i] / dt + 
-                        cp_m * (T_m[i] * rho_m[i] * v_m[i] - T_m[i - 1] * rho_m[i - 1] * v_m[i - 1]) / dz +
-                        p_m[i] * (v_m[i] - v_m[i - 1]) / dz;
-        Diag_i[2][3] = 0;
-        Diag_i[2][4] = 0;
-        Diag_i[2][5] = 0;
-        Diag_i[2][6] = (T_m[i] * cp_m * alpha_m[i] * rho_m[i]) / dz + (p_m[i] * alpha_m[i]) / dz;
-        Diag_i[2][7] = 0;
-        Diag_i[2][8] = (alpha_m[i] * rho_m[i] * cp_m) / dt + 
-                        (alpha_m[i] * rho_m[i] * cp_m * v_m[i] - alpha_m[i - 1] * rho_m[i - 1] * cp_m * v_m[i - 1]) / dz -
-                        k_m * (alpha_m[i] - alpha_m[i - 1]) / (dz * dz) -
-                        C44 - h_xv_v * C38;
-        Diag_i[2][9] = -C42 - h_xv_v * C36;
-        Diag_i[2][10] = -C43 - h_xv_v * C37;
+        const double cp_m_p, cp_m_l, cp_m_r;
+        const double k_m_p, k_m_l, k_m_r;
 
-        Q_i[2] = 3 * (alpha_m[i] * T_m[i] * rho_m[i]) / dt + 
-                        3 * cp_m * (alpha_m[i] * rho_m[i] * T_m[i] * v_m[i] - alpha_m[i - 1] * rho_m[i - 1] * T_m[i - 1]* v_m[i - 1]) / dz + 
-                        p_m[i] * (alpha_m[i] * v_m[i] - alpha_m[i - 1] * v_m[i - 1]) / dz +
-                        C46 + h_xv_v * C40;
+        add(Diag_i, 2, 0,
+            (alpha_m[i] * T_m[i] * cp_m_p) / dt
+            + (alpha_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i])) / dz
+            - (alpha_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1]))) / dz
+            + p_m[i] / dt
+            - C45 - h_xv_v * C39);
 
-        Left_i[2][0] = 0;
-        Left_i[2][1] = 0;
-        Left_i[2][2] = 0;
-        Left_i[2][3] = 0;
-        Left_i[2][4] = 0;
-        Left_i[2][5] = 0;
-        Left_i[2][6] = -(T_m[i - 1] * cp_m * alpha_m[i - 1] * rho_m[i - 1]) / dz - (p_m[i] * alpha_m[i - 1]) / dz;
-        Left_i[2][7] = 0;
-        Left_i[2][8] = -(alpha_m[i - 1] * k_m) / (dz * dz);
-        Left_i[2][9] = 0;
-        Left_i[2][10] = 0;
+        add(Diag_i, 2, 2,
+            (T_m[i] * rho_m[i] * cp_m_p) / dt
+            + (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i])) / dz
+            - (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1]))) / dz
+            + p_m[i] * (v_m[i] * H(v_m[i]) + v_m[i - 1] * H(v_m[i - 1])) / dz);
 
-        Right_i[2][0] = 0;
-        Right_i[2][1] = 0;
-        Right_i[2][2] = 0;
-        Right_i[2][3] = 0;
-        Right_i[2][4] = 0;
-        Right_i[2][5] = 0;
-        Right_i[2][6] = 0;
-        Right_i[2][7] = 0;
-        Right_i[2][8] = - (alpha_m[i] * k_m) / (dz * dz);
-        Right_i[2][9] = 0;
-        Right_i[2][10] = 0;
+        add(Diag_i, 2, 6,
+            (T_m[i] * cp_m_p* alpha_m[i] * rho_m[i]) / dt
+            + (alpha_m[i] * rho_m[i] * cp_m_p * T_m[i] * H(v_m[i]) + alpha_m[i + 1] * rho_m[i + 1] * cp_m_r * T_m[i + 1] * (1 - H(v_m[i]))) / dz
+            + p_m[i] * (alpha_m[i] * H(v_m[i]) + alpha_m[i + 1] * (1 - H(v_m[i]))) / dz);
+
+        add(Diag_i, 2, 8,
+            + (alpha_m[i] * rho_m[i] * cp_m_p * v_m[i] * H(v_m[i])) / dz
+            - (alpha_m[i] * rho_m[i] * cp_m_p * v_m[i] * (1 - H(v_m[i - 1]))) / dz
+            + (alpha_m[i] * k_m_p * H(v_m[i]) + alpha_m[i + 1] * k_m_r * (1 - H(v_m[i]))) / (dz * dz)
+            + (alpha_m[i - 1] * k_m_l * H(v_m[i - 1]) + alpha_m[i] * k_m_p * (1 - H(v_m[i - 1]))) / (dz * dz)
+            - C44 - h_xv_v * C38);
+
+        add(Diag_i, 2, 9, - C42 - h_vx_x * C36);
+        add(Diag_i, 2, 10, -C43 - h_xv_v * C37);
+
+        Q_i[2] = 3 * (alpha_m[i] * T_m[i] * rho_m[i]) / dt 
+            + 3 * ( 
+                + alpha_m[i] * rho_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i]) 
+                + alpha_m[i + 1] * rho_m[i + 1] * cp_m_r * T_m[i + 1] * v_m[i + 1] * (1 - H(v_m[i]))
+                - alpha_m[i - 1] * rho_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1]) 
+                - alpha_m[i] * rho_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1]))
+                ) / dz
+            + p_m[i] * (
+                + alpha_m[i] * v_m[i] * H(v_m[i])
+                + alpha_m[i + 1] * v_m[i] * (1 - H(v_m[i]))
+                - alpha_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])
+                - alpha_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))
+                    ) / dz
+            + p_m[i] * alpha_m[i] / dt
+            + C46 + h_xv_v * C40;
+
+        add(Left_i, 2, 0,
+            -(alpha_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz);
+
+        add(Left_i, 2, 2,
+            (rho_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz
+            + p_m[i] * (v_m[i - 1] * H(v_m[i - 1])) / dz);
+
+        add(Left_i, 2, 6,
+            -(
+                + alpha_m[i - 1] * rho_m[i - 1] * cp_m_l * T_m[i - 1] * H(v_m[i - 1]) 
+                + alpha_m[i] * rho_m[i] * cp_m_l * T_m[i] * (1 - H(v_m[i - 1]))
+                ) / dz
+            - p_m[i] * (
+                + alpha_m[i - 1] * H(v_m[i - 1]) 
+                + alpha_m[i] * (1 - H(v_m[i - 1]))
+                ) / dz);
+
+        add(Left_i, 2, 8,
+            -(alpha_m[i - 1] * rho_m[i - 1] * cp_m_l * v_m[i - 1] * H(v_m[i - 1])) / dz
+            - (alpha_m[i - 1] * k_m_l * H(v_m[i - 1]) + alpha_m[i] * k_m_p * (1 - H(v_m[i - 1]))) / (dz * dz));
+
+
+        add(Right_i, 2, 0,
+            (alpha_m[i + 1] * cp_m_r * T_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz);
+
+        add(Right_i, 2, 2,
+            (rho_m[i + 1] * cp_m_r * T_m[i + 1] * v_m[i] * (1 - H(v_m[i]))) / dz
+            + p_m[i] * (v_m[i] * (1 - H(v_m[i]))) / dz);
+
+        add(Right_i, 2, 8,
+            (alpha_m[i + 1] * rho_m[i + 1] * cp_m_r * v_m[i] * (1 - H(v_m[i]))) / dz
+            - (alpha_m[i] * k_m_p * H(v_m[i]) + alpha_m[i + 1] * k_m_r * (1 - H(v_m[i]))) / (dz * dz));
 
         // Heat liquid equation
 
-        Diag_i[3][0] = eps_s * cp_m * (alpha_l[i] * T_l[i]) / dt +
-                        eps_s * cp_m * (T_l[i] * rho_l[i] * v_l[i] - T_l[i - 1] * rho_l[i - 1] * v_l[i - 1]) / dz -
-                        C57 - h_vx_x * C39 - C51;
-        Diag_i[3][1] = 0;
-        Diag_i[3][2] = 0;
-        Diag_i[3][3] = eps_v * cp_m * (rho_l[i] * T_l[i]) / dt + 
-                        p_l[i] / dt +
-                        cp * eps_v * (T_l[i] * rho_l[i] * v_l[i] - T_l[i - 1] * rho_l[i - 1] * v_l[i - 1]) / dz +
-                        p_l[i] * (v_l[i] - v_l[i - 1]) / dz;
-        Diag_i[3][4] = 0;
-        Diag_i[3][5] = 0;
-        Diag_i[3][6] = 0;
-        Diag_i[3][7] = eps_v * (p_l[i] * alpha_l[i]) / dz + eps_v * cp_l * (alpha_l[i] * rho_l[i] * T_l[i]);
-        Diag_i[3][8] = -C56 - h_vx_x * C38 - C50;
-        Diag_i[3][9] = eps_v * cp_l * (alpha_l[i] * rho_l[i]) / dt +
-                        eps_v * cp_l * (alpha_l[i] * rho_l[i] * v_l[i] - alpha_l[i - 1] * rho_l[i - 1] * v_l[i - 1]) -
-                        k_m * (alpha_l[i] - alpha_l[i - 1]) / (dz * dz) -
-                        C54 - C48 - h_vx_x * C36;   
-        Diag_i[3][10] = -C55 - h_vx_x * C37 - C49;
+        const double cp_l_p, cp_l_l, cp_l_r;
+        const double k_l_p, k_l_l, k_l_r;
 
-        Q_i[3] = 3 * eps_v * cp_l * alpha_l[i] * rho_l[i] * T_l[i] / dt +
-                        3 * cp_l * (alpha_l[i] * rho_l[i] * T_l[i] - alpha_l[i - 1] * rho_l[i - 1] * T_l[i - 1]) / dz +
-                        eps_v * p_l[i] * (alpha_l[i] * v_l[i] - alpha_l[i - 1] * v_l[i - 1]) / dz +
-                        C52 + C58 + h_vx_x * C40;
+        add(Diag_i, 2, 0, );
 
-        Left_i[3][0] = 0;
-        Left_i[3][1] = 0;
-        Left_i[3][2] = 0;
-        Left_i[3][3] = 0;
-        Left_i[3][4] = 0;
-        Left_i[3][5] = 0;
-        Left_i[3][6] = 0;
-        Left_i[3][7] = -eps_v * (p_l[i] * alpha_l[i - 1]) / dz - eps_v * cp_l (alpha_l[i - 1] * rho_l[i - 1] * T_l[i - 1]) / dz;
-        Left_i[3][8] = 0;
-        Left_i[3][9] = -alpha_l[i - 1] * k_l / (dz * dz);
-        Left_i[3][10] = 0;
+        add(Diag_i, 2, 1,
+            eps_v * 
+                (alpha_l[i] * T_l[i] * cp_l_p) / dt
+                + (alpha_l[i] * cp_l_p * T_l[i] * v_l[i] * H(v_l[i])) / dz
+                - (alpha_l[i] * cp_l_p * T_l[i] * v_l[i] * (1 - H(v_l[i - 1]))) / dz
+                + p_l[i] / dt);
 
-        Right_i[3][0] = 0;
-        Right_i[3][1] = 0;
-        Right_i[3][2] = 0;
-        Right_i[3][3] = 0;
-        Right_i[3][4] = 0;
-        Right_i[3][5] = 0;
-        Right_i[3][6] = 0;
-        Right_i[3][7] = 0;
-        Right_i[3][8] = 0;
-        Right_i[3][9] = - alpha_l[i] * k_l / (dz * dz);
-        Right_i[3][10] = 0;
+        add(Diag_i, 2, 3,
+            eps_v * (
+                T_l[i] * rho_l[i] * cp_l_p) / dt
+                + (rho_l[i] * cp_l_p * T_l[i] * v_l[i] * H(v_l[i])) / dz
+                - (rho_l[i] * cp_l_p * T_l[i] * v_l[i] * (1 - H(v_l[i - 1]))) / dz
+                + p_l[i] * (v_l[i] * H(v_l[i]) + v_l[i - 1] * H(v_l[i - 1])) / dz);
 
+        add(Diag_i, 2, 7, 
+            eps_v* (
+                T_l[i] * cp_l_p * alpha_l[i] * rho_l[i]) / dt
+                + (alpha_l[i] * rho_l[i] * cp_l_p * T_l[i] * H(v_l[i]) + alpha_l[i + 1] * rho_l[i + 1] * cp_l_r * T_l[i + 1] * (1 - H(v_l[i]))) / dz
+                + p_l[i] * (alpha_l[i] * H(v_l[i]) + alpha_l[i + 1] * (1 - H(v_l[i]))) / dz);
+
+        add(Diag_i, 2, 8, 
+            -C56 - h_vx_x * C38 - C50);
+
+        add(Diag_i, 2, 9,
+            eps_v * (
+                + alpha_l[i] * rho_l[i] * cp_l_p * v_l[i] * H(v_l[i])) / dz
+                - (alpha_l[i] * rho_l[i] * cp_l_p * v_l[i] * (1 - H(v_l[i - 1]))) / dz
+                + (alpha_l[i] * k_l_p * H(v_l[i]) + alpha_l[i + 1] * k_l_r * (1 - H(v_l[i]))) / (dz * dz)
+                + (alpha_l[i - 1] * k_l_l * H(v_l[i - 1]) + alpha_l[i] * k_l_p * (1 - H(v_l[i - 1]))) / (dz * dz)
+                - C44 - h_xv_v * C38)
+            - C54 - C48 - h_vx_x * C36;
+
+        add(Diag_i, 2, 10, 
+            -C55 - h_vx_x * C37 - C49);
+
+        Q_i[2] = 
+            eps_v * (
+                + 3 * (alpha_l[i] * T_l[i] * rho_l[i]) / dt
+                + 3 * (
+                    +alpha_l[i] * rho_l[i] * cp_l_p * T_l[i] * v_l[i] * H(v_l[i])
+                    + alpha_l[i + 1] * rho_l[i + 1] * cp_l_r * T_l[i + 1] * v_l[i + 1] * (1 - H(v_l[i]))
+                    - alpha_l[i - 1] * rho_l[i - 1] * cp_l_l * T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])
+                    - alpha_l[i] * rho_l[i] * cp_l_p * T_l[i] * v_l[i] * (1 - H(v_l[i - 1]))
+                    ) / dz
+                + p_l[i] * (
+                    +alpha_l[i] * v_l[i] * H(v_l[i])
+                    + alpha_l[i + 1] * v_l[i] * (1 - H(v_l[i]))
+                    - alpha_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])
+                    - alpha_l[i] * v_l[i - 1] * (1 - H(v_l[i - 1]))
+                    ) / dz
+                + p_l[i] * alpha_l[i] / dt)
+            + C52 + C58 + h_vx_x * C40;
+
+        add(Left_i, 2, 1,
+            eps_v * (
+            -(alpha_l[i - 1] * cp_l_l * T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz));
+
+        add(Left_i, 2, 3,
+            eps_v * (
+                (rho_l[i - 1] * cp_l_l* T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz
+                + p_l[i] * (v_l[i - 1] * H(v_l[i - 1])) / dz));
+
+        add(Left_i, 2, 7,
+            eps_v * (
+                -(
+                    +alpha_l[i - 1] * rho_l[i - 1] * cp_l_l * T_l[i - 1] * H(v_l[i - 1])
+                    + alpha_l[i] * rho_l[i] * cp_l_l * T_l[i] * (1 - H(v_l[i - 1]))
+                ) / dz
+            - p_l[i] * (
+                +alpha_l[i - 1] * H(v_l[i - 1])
+                + alpha_l[i] * (1 - H(v_l[i - 1]))
+                ) / dz));
+
+        add(Left_i, 2, 9,
+            eps_v * (
+            -(alpha_l[i - 1] * rho_l[i - 1] * cp_l_l * v_l[i - 1] * H(v_l[i - 1])) / dz
+            - (alpha_l[i - 1] * k_l_l * H(v_l[i - 1]) + alpha_l[i] * k_l_p * (1 - H(v_l[i - 1]))) / (dz * dz)));
+
+        add(Right_i, 2, 1,
+            eps_v * (
+            (alpha_l[i + 1] * cp_l_r* T_l[i + 1] * v_l[i] * (1 - H(v_l[i]))) / dz));
+
+        add(Right_i, 2, 3,
+            eps_v * (
+            (rho_l[i + 1] * cp_l_r* T_l[i + 1] * v_l[i] * (1 - H(v_l[i]))) / dz
+            + p_l[i] * (v_l[i] * (1 - H(v_l[i]))) / dz));
+
+        add(Right_i, 2, 9,
+            eps_v * (
+                (alpha_l[i + 1] * rho_l[i + 1] * cp_l_r* v_l[i] * (1 - H(v_l[i]))) / dz
+                - (alpha_l[i] * k_l_p * H(v_l[i]) + alpha_l[i + 1] * k_l_r * (1 - H(v_l[i]))) / (dz * dz)));
 
         // Heat wall equation
 
-        Diag_i[4][0] = -C57 * C64 / C53;
-        Diag_i[4][1] = 0;
-        Diag_i[4][2] = 0;
-        Diag_i[4][3] = 0;
-        Diag_i[4][4] = 0;
-        Diag_i[4][5] = 0;
-        Diag_i[4][6] = 0;
-        Diag_i[4][7] = 0;
-        Diag_i[4][8] = C56 * C64 / C53;
-        Diag_i[4][9] = -C54 * C64 / C53;
-        Diag_i[4][10] = rho_w * cp_w - C55 / C53 * C64 + 2 * k_w / (dz * dz);
+        const double rho_w_p, rho_w_l, rho_w_r;
+        const double cp_w_p, cp_w_l, cp_w_r;
+        const double k_w_p, k_w_l, k_w_r;
+        const double k_w_lf = 0.5 * (k_w_l + k_w_p);
+        const double k_w_rf = 0.5 * (k_w_r + k_w_p;
 
-        Q_i[4] = q_pp * 2 * r_o / (r_o * r_o - r_i * r_i) + rho_w * cp_w * T_w[i] / dt + C58 * C64 / C53;
+        add(Diag_i, 4, 0, -C57 * C64 / C53);
 
-        Left_i[4][0] = 0;
-        Left_i[4][1] = 0;
-        Left_i[4][2] = 0;
-        Left_i[4][3] = 0;
-        Left_i[4][4] = 0;
-        Left_i[4][5] = 0;
-        Left_i[4][6] = 0;
-        Left_i[4][7] = 0;
-        Left_i[4][8] = 0;
-        Left_i[4][9] = 0;
-        Left_i[4][10] = -k_w / (dz * dz);
+        add(Diag_i, 4, 8, C56* C64 / C53);
 
-        Right_i[4][0] = 0;
-        Right_i[4][1] = 0;
-        Right_i[4][2] = 0;
-        Right_i[4][3] = 0;
-        Right_i[4][4] = 0;
-        Right_i[4][5] = 0;
-        Right_i[4][6] = 0;
-        Right_i[4][7] = 0;
-        Right_i[4][8] = 0;
-        Right_i[4][9] = 0;
-        Right_i[4][10] = -k_w / (dz * dz);
+        add(Diag_i, 4, 9, -C54 * C64 / C53);
 
+        add(Diag_i, 4, 10,
+            (rho_w_p* cp_w_p) / dt
+            - (C55 / C53) * C64
+            + (k_w_lf + k_w_rf) / (dz * dz));
+
+        Q_i[4] =
+            q_pp * 2 * r_o / (r_o * r_o - r_i * r_i)
+            + (rho_w_p * cp_w_p * T_w[i]) / dt
+            + C58 * C64 / C53;
+
+        add(Left_i, 4, 10,
+            -k_w_lf / (dz * dz));
+
+        add(Right_i, 4, 10,
+            -k_w_rf / (dz * dz));
 
         // Momentum mixture equation
 
@@ -1155,162 +1212,113 @@ int main() {
 
         // State mixture equation
 
-        Diag_i[7][0] = -T_m[i] * Rv;
-        Diag_i[7][1] = 0;
-        Diag_i[7][2] = 0;
-        Diag_i[7][3] = 0;
-        Diag_i[7][4] = 1;
-        Diag_i[7][5] = 0;
-        Diag_i[7][6] = 0;
-        Diag_i[7][7] = 0;
-        Diag_i[7][8] = -rho_m[i] * Rv;
-        Diag_i[7][9] = 0;
-        Diag_i[7][10] = 0;
+        add(Diag_i, 7, 0, -T_m[i] * Rv);
+        add(Diag_i, 7, 8, -rho_m[i] * Rv);
 
         Q_i[7] = -rho_m[i] * T_m[i] * Rv;
 
-        Left_i[7][0] = 0;
-        Left_i[7][1] = 0;
-        Left_i[7][2] = 0;
-        Left_i[7][3] = 0;
-        Left_i[7][4] = 0;
-        Left_i[7][5] = 0;
-        Left_i[7][6] = 0;
-        Left_i[7][7] = 0;
-        Left_i[7][8] = 0;
-        Left_i[7][9] = 0;
-        Left_i[7][10] = 0;
-
-        Right_i[7][0] = 0;
-        Right_i[7][1] = 0;
-        Right_i[7][2] = 0;
-        Right_i[7][3] = 0;
-        Right_i[7][4] = 0;
-        Right_i[7][5] = 0;
-        Right_i[7][6] = 0;
-        Right_i[7][7] = 0;
-        Right_i[7][8] = 0;
-        Right_i[7][9] = 0;
-        Right_i[7][10] = 0;
-
         // State liquid equation
 
-        Diag_i[8][0] = 0;
-        Diag_i[8][1] = 1;
-        Diag_i[8][2] = 0;
-        Diag_i[8][3] = 0;
-        Diag_i[8][4] = 0;
-        Diag_i[8][5] = 0;
-        Diag_i[8][6] = 0;
-        Diag_i[8][7] = 0;
-        Diag_i[8][8] = 0;
-        Diag_i[8][9] = C62;
-        Diag_i[8][10] = 0;
+        add(Diag_i, 8, 1, 1);
+        add(Diag_i, 8, 9, C62);
 
         Q_i[8] = C63;
 
-        Left_i[8][0] = 0;
-        Left_i[8][1] = 0;
-        Left_i[8][2] = 0;
-        Left_i[8][3] = 0;
-        Left_i[8][4] = 0;
-        Left_i[8][5] = 0;
-        Left_i[8][6] = 0;
-        Left_i[8][7] = 0;
-        Left_i[8][8] = 0;
-        Left_i[8][9] = 0;
-        Left_i[8][10] = 0;
-
-        Right_i[8][0] = 0;
-        Right_i[8][1] = 0;
-        Right_i[8][2] = 0;
-        Right_i[8][3] = 0;
-        Right_i[8][4] = 0;
-        Right_i[8][5] = 0;
-        Right_i[8][6] = 0;
-        Right_i[8][7] = 0;
-        Right_i[8][8] = 0;
-        Right_i[8][9] = 0;
-        Right_i[8][10] = 0;
-
         // Volume fraction sum
 
-        Diag_i[9][0] = 0;
-        Diag_i[9][1] = 0;
-        Diag_i[9][2] = 1;
-        Diag_i[9][3] = 1;
-        Diag_i[9][4] = 0;
-        Diag_i[9][5] = 0;
-        Diag_i[9][6] = 0;
-        Diag_i[9][7] = 0;
-        Diag_i[9][8] = 0;
-        Diag_i[9][9] = 0;
-        Diag_i[9][10] = 0;
+        add(Diag_i, 9, 2, 1);
+        add(Diag_i, 9, 3, 1);
 
         Q_i[9] = 1;
 
-        Left_i[9][0] = 0;
-        Left_i[9][1] = 0;
-        Left_i[9][2] = 0;
-        Left_i[9][3] = 0;
-        Left_i[9][4] = 0;
-        Left_i[9][5] = 0;
-        Left_i[9][6] = 0;
-        Left_i[9][7] = 0;
-        Left_i[9][8] = 0;
-        Left_i[9][9] = 0;
-        Left_i[9][10] = 0;
-
-        Right_i[9][0] = 0;
-        Right_i[9][1] = 0;
-        Right_i[9][2] = 0;
-        Right_i[9][3] = 0;
-        Right_i[9][4] = 0;
-        Right_i[9][5] = 0;
-        Right_i[9][6] = 0;
-        Right_i[9][7] = 0;
-        Right_i[9][8] = 0;
-        Right_i[9][9] = 0;
-        Right_i[9][10] = 0;
-
         // Capillary equation
 
-        Diag_i[10][0] = 0;
-        Diag_i[10][1] = 0;
-        Diag_i[10][2] = 0;
-        Diag_i[10][3] = 0;
-        Diag_i[10][4] = 1;
-        Diag_i[10][5] = -1;
-        Diag_i[10][6] = 0;
-        Diag_i[10][7] = 0;
-        Diag_i[10][8] = 0;
-        Diag_i[10][9] = 0;
-        Diag_i[10][10] = 0;
+        add(Diag_i, 10, 4, 1);
+        add(Diag_i, 10, 5, -1);
 
         Q_i[10] = DPcap;
-
-        Left_i[10][0] = 0;
-        Left_i[10][1] = 0;
-        Left_i[10][2] = 0;
-        Left_i[10][3] = 0;
-        Left_i[10][4] = 0;
-        Left_i[10][5] = 0;
-        Left_i[10][6] = 0;
-        Left_i[10][7] = 0;
-        Left_i[10][8] = 0;
-        Left_i[10][9] = 0;
-        Left_i[10][10] = 0;
-
-        Right_i[10][0] = 0;
-        Right_i[10][1] = 0;
-        Right_i[10][2] = 0;
-        Right_i[10][3] = 0;
-        Right_i[10][4] = 0;
-        Right_i[10][5] = 0;
-        Right_i[10][6] = 0;
-        Right_i[10][7] = 0;
-        Right_i[10][8] = 0;
-        Right_i[10][9] = 0;
-        Right_i[10][10] = 0;
     }
+
+    // First node boundary conditions
+
+    SparseBlock Diag_first, Right_first;
+    VecBlock Q_first{};
+
+    add(Diag_first, 0, 0, 1.0);
+    add(Diag_first, 1, 1, 1.0);
+    add(Diag_first, 2, 2, 1.0);
+    add(Diag_first, 3, 3, 1.0);
+    add(Diag_first, 4, 4, 1.0);
+    add(Diag_first, 5, 5, 1.0);
+    add(Diag_first, 6, 6, 1.0);
+    add(Diag_first, 7, 7, 1.0);
+    add(Diag_first, 8, 8, 1.0);
+    add(Diag_first, 9, 9, 1.0);
+    add(Diag_first, 10, 10, 1.0);
+
+    add(Right_first, 0, 0, -1.0);
+    add(Right_first, 1, 1, -1.0);
+    add(Right_first, 2, 2, -1.0);
+    add(Right_first, 3, 3, -1.0);
+    add(Right_first, 4, 4, -1.0);
+    add(Right_first, 5, 5, -1.0);
+    add(Right_first, 6, 6, 0.0);
+    add(Right_first, 7, 7, 0.0);
+    add(Right_first, 8, 8, -1.0);
+    add(Right_first, 9, 9, -1.0);
+    add(Right_first, 10, 10, -1.0);
+
+    Q_first[0] = 0.0;
+    Q_first[1] = 0.0;
+    Q_first[2] = 0.0;
+    Q_first[3] = 0.0;
+    Q_first[4] = 0.0;
+    Q_first[5] = 0.0;
+    Q_first[6] = 0.0;
+    Q_first[7] = 0.0;
+    Q_first[8] = 0.0;
+    Q_first[9] = 0.0;
+    Q_first[10] = 0.0;
+
+    // Last node boundary conditions
+
+    SparseBlock Diag_last, Left_last;
+    VecBlock Q_last{};
+
+    add(Diag_last, 0, 0, 1.0);
+    add(Diag_last, 1, 1, 1.0);
+    add(Diag_last, 2, 2, 1.0);
+    add(Diag_last, 3, 3, 1.0);
+    add(Diag_last, 4, 4, 1.0);
+    add(Diag_last, 5, 5, 1.0);
+    add(Diag_last, 6, 6, 1.0);
+    add(Diag_last, 7, 7, 1.0);
+    add(Diag_last, 8, 8, 1.0);
+    add(Diag_last, 9, 9, 1.0);
+    add(Diag_last, 10, 10, 1.0);
+
+    add(Left_last, 0, 0, -1.0);
+    add(Left_last, 1, 1, -1.0);
+    add(Left_last, 2, 2, -1.0);
+    add(Left_last, 3, 3, -1.0);
+    add(Left_last, 4, 4, -1.0);
+    add(Left_last, 5, 5, -1.0);
+    add(Left_last, 6, 6, 0.0);
+    add(Left_last, 7, 7, 0.0);
+    add(Left_last, 8, 8, -1.0);
+    add(Left_last, 9, 9, -1.0);
+    add(Left_last, 10, 10, -1.0);
+
+    Q_last[0] = 0.0;
+    Q_last[1] = 0.0;
+    Q_last[2] = 0.0;
+    Q_last[3] = 0.0;
+    Q_last[4] = 0.0;
+    Q_last[5] = 0.0;
+    Q_last[6] = 0.0;
+    Q_last[7] = 0.0;
+    Q_last[8] = 0.0;
+    Q_last[9] = 0.0;
+    Q_last[10] = 0.0;
+
 }
