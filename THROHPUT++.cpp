@@ -164,6 +164,10 @@ namespace liquid_sodium {
         const double M_kg_per_mol = 22.98976928e-3; // Molar mass Na
         return (H_kJ_per_mol * 1000.0) / M_kg_per_mol;
     }
+
+    double surf_ten(double T) {
+        return 4.53e-1 - 1.48e-4 * T;
+    }
 }
 
 #pragma endregion
@@ -446,12 +450,13 @@ namespace vapor_sodium {
 
 #pragma endregion
 
-
 // =======================================================================
 //
 //                        [SOLVING FUNCTIONS]
 //
 // =======================================================================
+
+#pragma region find_mu
 
 constexpr int B = 11;  // dimensione blocco
 
@@ -483,13 +488,9 @@ double invert(double L_target) {
     return mu;
 }
 
-double surf_ten(double T) {
-    return 4.53e-1 - 1.48e-4 * T;
-}
+#pragma endregion
 
-inline int H(double x) {
-    return x > 0.0 ? 1 : 0;
-}
+#pragma region solving_functions
 
 struct SparseBlock {
     std::vector<int> row;
@@ -718,11 +719,17 @@ auto add = [&](SparseBlock& B, int p, int q, double v) {
     B.row.push_back(p);
     B.col.push_back(q);
     B.val.push_back(v);
-    };
+};
+
+#pragma endregion
+
+inline int H(double x) {
+    return x > 0.0 ? 1 : 0;
+}
 
 int main() {
 
-#pragma region constants_and_variables
+    #pragma region constants_and_variables
 
     // Mathematical constants
     const double M_PI = 3.14159265358979323846;
@@ -880,20 +887,21 @@ int main() {
 
     for(int i = 1; i <= N - 2; ++i){
 
-        const double k_w = steel::k(T_w_bulk[i]);                               ///< Wall thermal conductivity [W/(m K)]
-        const double k_x = liquid_sodium::k(T_x_bulk[i]);                       ///< Liquid thermal conductivity [W/(m K)]
-        const double k_m = vapor_sodium::k(T_m[i], p_m[i]);           ///< Vapor thermal conductivity [W/(m K)]
-        const double cp_m = vapor_sodium::cp(T_m[i]);                      ///< Vapor specific heat [J/(kg K)]
-        const double mu_v = vapor_sodium::mu(T_v_bulk[i]);                      ///< Vapor dynamic viscosity [Pa*s]
-        const double mu_l = liquid_sodium::mu(T_x_bulk[i]);
+        const double k_w = steel::k(T_w_bulk[i]);                           ///< Wall thermal conductivity [W/(m K)]
+        const double k_x = liquid_sodium::k(T_x_bulk[i]);                   ///< Liquid thermal conductivity [W/(m K)]
+        const double k_m = vapor_sodium::k(T_m[i], p_m[i]);                 ///< Vapor thermal conductivity [W/(m K)]
+        const double cp_m = vapor_sodium::cp(T_m[i]);                       ///< Vapor specific heat [J/(kg K)]
+        const double mu_v = vapor_sodium::mu(T_v_bulk[i]);                  ///< Vapor dynamic viscosity [Pa*s]
+        const double mu_l = liquid_sodium::mu(T_x_bulk[i]);                 ///< Liquid dynamic viscosity
         const double Dh_v = 2.0 * r_v;                                      ///< Hydraulic diameter of the vapor core [m]
-        const double Re_v = rho_m[i] * std::fabs(v_m[i]) * Dh_v / mu_v;         ///< Reynolds number [-]
-        const double Pr_v = cp_m * mu_v / k_m;                             ///< Prandtl number [-]
-        const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);   ///< Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-        const double Psat = vapor_sodium::P_sat(T_x_v[i]);                      ///< Saturation pressure [Pa]         
-        const double dPsat_dT = Psat * std::log(10.0) * (7740.0 / (T_x_v[i] * T_x_v[i]));   ///< Derivative of the saturation pressure wrt T [Pa/K]   
-        const double beta = 1.0 / std::sqrt();
-        const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);    ///< Useful factor in the coefficients calculation [s / m^2]
+        const double Re_v = rho_m[i] * std::fabs(v_m[i]) * Dh_v / mu_v;     ///< Reynolds number [-]
+        const double Pr_v = cp_m * mu_v / k_m;                              ///< Prandtl number [-]
+        const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);    ///< Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+        const double Psat = vapor_sodium::P_sat(T_x_v[i]);                  ///< Saturation pressure [Pa]         
+        const double dPsat_dT = 
+            Psat * std::log(10.0) * (7740.0 / (T_x_v[i] * T_x_v[i]));       ///< Derivative of the saturation pressure wrt T [Pa/K]   
+        const double beta = 1.0 / std::sqrt();                  
+        const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);        ///< Useful factor in the coefficients calculation [s / m^2]
         const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));
 
         if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
@@ -928,21 +936,16 @@ int main() {
         const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
         const double Ex3 = H_xm + (h_vx_x * r_i * r_i) / (2.0 * r_v) * bGamma;
-
         const double Ex4 =
             -k_x +
             H_xm * r_v +
             h_vx_x * r_i * r_i / 2.0 * bGamma;
-
         const double Ex5 =
             -2.0 * r_v * k_x +
             H_xm * r_v * r_v +
             h_vx_x * r_i * r_i / 2.0 * bGamma * r_v;
-
         const double Ex6 = -H_xm;
-
         const double Ex7 = (h_vx_x * r_i * r_i) / (2.0 * r_v) * cGamma;
-
         const double Ex8 = (h_vx_x * r_i * r_i) / (2.0 * r_v) * aGamma;
 
         const double alpha = 1.0 / (2 * r_o * (Eio1 - r_i) + r_i * r_i - Eio2);
@@ -1017,7 +1020,7 @@ int main() {
 
         const double alpha_m0 = r_v * r_v / (r_i * r_i);
         const double r_p = 1e-5;
-        const double surf_ten_value = surf_ten(T_l[i]);                                /// TOCHANGEEEEE
+        const double surf_ten_value = liquid_sodium::surf_ten(T_l[i]);                                /// TOCHANGEEEEE
 
         const double Lambda = 3 * r_v / (eps_s * r_p) * (alpha_m[i] - alpha_m0);
         double DPcap = 0.0;
