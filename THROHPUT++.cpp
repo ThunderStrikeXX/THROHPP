@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <stdexcept>
 
+bool warnings = false;
+
 // =======================================================================
 //
 //                       [MATERIAL PROPERTIES]
@@ -727,6 +729,7 @@ inline int H(double x) {
     return x > 0.0 ? 1 : 0;
 }
 
+
 int main() {
 
     #pragma region constants_and_variables
@@ -755,8 +758,8 @@ int main() {
 
     // Geometric parameters
     const int N = 200;                                                         ///< Number of axial nodes [-]
-    const double L = 0.982; 			                                        ///< Length of the heat pipe [m]
-    const double dz = L / N;                                                    ///< Axial discretization step [m]
+    const double l = 0.982; 			                                        ///< Length of the heat pipe [m]
+    const double dz = l / N;                                                    ///< Axial discretization step [m]
     const double evaporator_length = 0.502;                                     ///< Evaporator length [m]
     const double adiabatic_length = 0.188;                                      ///< Adiabatic length [m]
     const double condenser_length = 0.292;                                      ///< Condenser length [m]
@@ -795,7 +798,7 @@ int main() {
 
     const double T_full = 800.0;
 
-    const double q_pp = power / (2 * M_PI * L * r_o);     ///< Heat flux at evaporator from given power [W/m^2]
+    const double q_pp = power / (2 * M_PI * evaporator_length * r_o);     ///< Heat flux at evaporator from given power [W/m^2]
 
     // Mass sources/fluxes
     std::vector<double> phi_x_v(N, 0.0);            ///< Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
@@ -824,7 +827,7 @@ int main() {
     mesh_io << std::setprecision(4);
 
     v_velocity_output << std::setprecision(4);
-    l_pressure_output << std::setprecision(4);
+    v_pressure_output << std::setprecision(4);
     v_temperature_output << std::setprecision(4);
     v_rho_output << std::setprecision(4);
 
@@ -852,34 +855,40 @@ int main() {
     std::vector<double> alpha_l(N, 0.1);
     std::vector<double> p_m(N, 10000);
     std::vector<double> p_l(N, 10000);
-    std::vector<double> v_m(N + 1, 1.0);
-    std::vector<double> v_l(N + 1, 0.01);
+    std::vector<double> v_m(N, 1.0);
+    std::vector<double> v_l(N, 0.01);
     std::vector<double> T_m(N, 800);
     std::vector<double> T_l(N, 800);
     std::vector<double> T_w(N, 800);
 
     std::vector<double> Gamma_xv(N, 0.0);
+    std::vector<double> T_sur(N, 0.0);
 
     std::vector<SparseBlock> L(N), D(N), R(N);
-    std::vector<VecBlock> Q(N), X;
+    std::vector<VecBlock> Q(N), X(N);
+
+    const double Eio1 = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));
+    const double Eio2 = 0.5 * (r_o * r_o + r_i * r_i);
+    const double Evi1 = 2.0 / 3.0 * (r_i + r_v - 1 / (1 / r_i + 1 / r_v));
+    const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     for(int n = 0; n < tot_iter; ++n){
 
         for(int i = 1; i < N - 1; ++i){
 
             const double k_w = steel::k(T_w[i]);                           ///< Wall thermal conductivity [W/(m K)]
-            const double k_x = liquid_sodium::k(T_x_bulk[i]);                   ///< Liquid thermal conductivity [W/(m K)]
+            const double k_x = liquid_sodium::k(T_l[i]);                   ///< Liquid thermal conductivity [W/(m K)]
             const double k_m = vapor_sodium::k(T_m[i], p_m[i]);                 ///< Vapor thermal conductivity [W/(m K)]
             const double cp_m = vapor_sodium::cp(T_m[i]);                       ///< Vapor specific heat [J/(kg K)]
-            const double mu_v = vapor_sodium::mu(T_v_bulk[i]);                  ///< Vapor dynamic viscosity [Pa*s]
-            const double mu_l = liquid_sodium::mu(T_x_bulk[i]);                 ///< Liquid dynamic viscosity
+            const double mu_v = vapor_sodium::mu(T_m[i]);                  ///< Vapor dynamic viscosity [Pa*s]
+            const double mu_l = liquid_sodium::mu(T_l[i]);                 ///< Liquid dynamic viscosity
             const double Dh_v = 2.0 * r_v;                                      ///< Hydraulic diameter of the vapor core [m]
             const double Re_v = rho_m[i] * std::fabs(v_m[i]) * Dh_v / mu_v;     ///< Reynolds number [-]
             const double Pr_v = cp_m * mu_v / k_m;                              ///< Prandtl number [-]
             const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);    ///< Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-            const double Psat = vapor_sodium::P_sat(T_x_v[i]);                  ///< Saturation pressure [Pa]         
+            const double Psat = vapor_sodium::P_sat(T_m[i]);                  ///< Saturation pressure [Pa]         
             const double dPsat_dT = 
-                Psat * std::log(10.0) * (7740.0 / (T_x_v[i] * T_x_v[i]));       ///< Derivative of the saturation pressure wrt T [Pa/K]   
+                Psat * std::log(10.0) * (7740.0 / (T_m[i] * T_m[i]));       ///< Derivative of the saturation pressure wrt T [Pa/K]   
         
             double h_xv_v;      ///< Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
             double h_vx_x;      ///< Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
@@ -887,27 +896,20 @@ int main() {
             if (phi_x_v[i] >= 0.0) {
 
                 // Evaporation case
-                h_xv_v = vapor_sodium::h(T_x_v[i]);
-                h_vx_x = liquid_sodium::h(T_x_v[i]);
+                h_xv_v = vapor_sodium::h(T_m[i]);
+                h_vx_x = liquid_sodium::h(T_l[i]);
 
             }
             else {
 
                 // Condensation case
-                h_xv_v = vapor_sodium::h(T_v_bulk[i]);
-                h_vx_x = liquid_sodium::h(T_x_v[i])
-                    + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v[i]));
+                h_xv_v = vapor_sodium::h(T_m[i]);
+                h_vx_x = liquid_sodium::h(T_l[i])
+                    + (vapor_sodium::h(T_m[i]) - vapor_sodium::h(T_l[i]));
             }
 
-            const double Eio1 = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));
-            const double Eio2 = 0.5 * (r_o * r_o + r_i * r_i);
-            const double Evi1 = 2.0 / 3.0 * (r_i + r_v - 1 / (1 / r_i + 1 / r_v));
-            const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
-
-            const double T_sur = C66 * T_l[i] + C67 * T_w[i] + C68 * T_v[i] + C69 * rho_m[i] + C70;
-
-            const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur);
-            const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));
+            const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur[i]);
+            const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_m[i]))));
 
             if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
             else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
@@ -915,9 +917,9 @@ int main() {
 
             const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);        ///< Useful factor in the coefficients calculation [s / m^2]
 
-            const double bGamma = -(Gamma_xv[i] / (2.0 * T_x_v[i])) + fac * sigma_e * dPsat_dT;   ///< b coefficient [kg/(m3 s K)] 
-            const double aGamma = 0.5 * Gamma_xv[i] + fac * sigma_e * dPsat_dT * T_x_v[i];        ///< a coefficient [kg/(m3 s)]
-            const double cGamma = -fac * sigma_c * Omega;        ///< c coefficient [s/m2]
+            const double bGamma = -(Gamma_xv[i] / (2.0 * T_sur[i])) + fac * sigma_e * dPsat_dT; ///< b coefficient [kg/(m3 s K)] 
+            const double aGamma = 0.5 * Gamma_xv[i] + fac * sigma_e * dPsat_dT * T_sur[i];      ///< a coefficient [kg/(m3 s)]
+            const double cGamma = -fac * sigma_c * Omega;                                       ///< c coefficient [s/m2]
 
             const double Ex3 = H_xm + (h_vx_x * r_i * r_i) / (2.0 * r_v) * bGamma;
             const double Ex4 =
@@ -952,7 +954,7 @@ int main() {
             const double C14 = -2 * r_o * C9;
             const double C15 = -2 * r_o * C10;
             const double C16 = -2 * r_o * C11;
-            const double C17 = -2 * r_o * C17 + q_pp / k_w;
+            const double C17 = -2 * r_o * C12 + q_pp / k_w;
             const double C18 = 2 * r_o * Eio1 - Eio2;
             const double C19 = C18 * C8;
             const double C20 = C18 * C9 + 1;
@@ -1007,11 +1009,13 @@ int main() {
             const double C63 = C59 + C60 * (1.0 - T_l[i] / Tc) + C61 * std::sqrt(1.0 - T_l[i] / Tc) + T_l[i] / Tc * (C60 + C61 / (2 * std::sqrt(1.0 - T_l[i] / Tc)));
             const double C64 = -k_w * 2 * r_i / (r_o * r_o - r_i * r_i);
 
+            T_sur[i] = C66 * T_l[i] + C67 * T_w[i] + C68 * T_m[i] + C69 * rho_m[i] + C70;
+
             // DPcap evaluation
 
             const double alpha_m0 = r_v * r_v / (r_i * r_i);
             const double r_p = 1e-5;
-            const double surf_ten_value = liquid_sodium::surf_ten(T_l[i]);                                /// TOCHANGEEEEE
+            const double surf_ten_value = liquid_sodium::surf_ten(T_l[i]); 
 
             const double Lambda = 3 * r_v / (eps_s * r_p) * (alpha_m[i] - alpha_m0);
             double DPcap = 0.0;
@@ -1144,9 +1148,9 @@ int main() {
             add(D[i], 2, 2,
                 (T_m[i] * rho_m[i] * cp_m_p) / dt
                 + (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i])) / dz
-                - (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1]))) / dz
+                - (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1])) / dz
                 + p_m[i] * (v_m[i] * H(v_m[i]) + v_m[i - 1] * H(v_m[i - 1])) / dz)
-                + p_m[i] / dt;
+                + p_m[i] / dt);
 
             add(D[i], 2, 6,
                 + (alpha_m[i] * rho_m[i] * cp_m_p * T_m[i] * H(v_m[i]) + alpha_m[i + 1] * rho_m[i + 1] * cp_m_r * T_m[i + 1] * (1 - H(v_m[i]))) / dz
@@ -1163,7 +1167,7 @@ int main() {
             add(D[i], 2, 9, - C42 - h_vx_x * C36);
             add(D[i], 2, 10, - C43 - h_xv_v * C37);
 
-            Q_i[2] = 
+            Q[i][2] = 
                 + 3 * (alpha_m[i] * T_m[i] * cp_m_p * rho_m[i]) / dt 
                 + 3 * ( 
                     + alpha_m[i] * rho_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i]) 
@@ -1234,14 +1238,13 @@ int main() {
                 eps_v * (
                     T_l[i] * rho_l[i] * cp_l_p) / dt
                     + (rho_l[i] * cp_l_p * T_l[i] * v_l[i] * H(v_l[i])) / dz
-                    - (rho_l[i] * cp_l_p * T_l[i] * v_l[i] * (1 - H(v_l[i - 1]))) / dz
+                    - (rho_l[i] * cp_l_p * T_l[i] * v_l[i] * (1 - H(v_l[i - 1])) / dz
                     + p_l[i] * (v_l[i] * H(v_l[i]) + v_l[i - 1] * H(v_l[i - 1])) / dz)
-                + eps_v * p_l[i] / dt;
+                + eps_v * p_l[i] / dt);
 
             add(D[i], 3, 7, 
-                eps_v * (
-                    + (alpha_l[i] * rho_l[i] * cp_l_p * T_l[i] * H(v_l[i]) + alpha_l[i + 1] * rho_l[i + 1] * cp_l_r * T_l[i + 1] * (1 - H(v_l[i]))) / dz
-                    + p_l[i] * (alpha_l[i] * H(v_l[i]) + alpha_l[i + 1] * (1 - H(v_l[i]))) / dz);
+                eps_v * (alpha_l[i] * rho_l[i] * cp_l_p * T_l[i] * H(v_l[i]) + alpha_l[i + 1] * rho_l[i + 1] * cp_l_r * T_l[i + 1] * (1 - H(v_l[i]))) / dz
+                + eps_v * (p_l[i] * (alpha_l[i] * H(v_l[i]) + alpha_l[i + 1] * (1 - H(v_l[i]))) / dz));
 
             add(D[i], 3, 8, 
                 -C56 - h_vx_x * C38 - C50);
@@ -1357,6 +1360,10 @@ int main() {
 
             // Momentum mixture equation
 
+            const double Re = rho_m[i] * v_m[i] * Dh_v / mu_v;
+            const double fm = Re > 1187.4 ? 0.3164 * std::pow(Re, -0.25) : 64 * std::pow(Re, -1);
+            const double Fm = fm * rho_m[i] * v_m[i] / (4 * r_v);
+
             add(D[i], 5, 0,
                 + (alpha_m[i] * v_m[i]) / dt
                 + (alpha_m[i] * v_m[i] * v_m[i] * H(v_m[i])) / dz
@@ -1375,8 +1382,8 @@ int main() {
                 + (alpha_m[i] * rho_m[i]) / dt
                 + 2 * (rho_m[i] * alpha_m[i] * v_m[i] * H(v_m[i])) / dz
                 + 2 * (rho_m[i + 1] * alpha_m[i + 1] * v_m[i + 1] * (1 - H(v_m[i]))) / dz
-                + (fm * rho_m[i] * std::abs(v_m[i]) * H(v_m[i])) / (4 * r_v)
-                + (fm * rho_m[i + 1] * std::abs(v_m[i]) * (1 - H(v_m[i]))) / (4 * r_v));
+                + (Fm * rho_m[i] * std::abs(v_m[i]) * H(v_m[i])) / (4 * r_v)
+                + (Fm * rho_m[i + 1] * std::abs(v_m[i]) * (1 - H(v_m[i]))) / (4 * r_v));
 
             Q[i][5] = 
                 + 3 * (alpha_m[i] * rho_m[i] * v_m[i]) / dt
@@ -1407,6 +1414,8 @@ int main() {
 
             // Momentum liquid equation
 
+            const double Fl = 8 * mu_l / ((r_i - r_v) * (r_i - r_v));
+
             add(D[i], 6, 1,
                 + eps_v * (alpha_l[i] * v_l[i]) / dt
                 + eps_v * (alpha_l[i] * v_l[i] * v_l[i] * H(v_l[i])) / dz
@@ -1415,8 +1424,8 @@ int main() {
             add(D[i], 6, 3,
                 + eps_v * (v_l[i] * rho_l[i]) / dt
                 + eps_v * (rho_l[i] * v_l[i] * v_l[i] * H(v_l[i])) / dz
-                - eps_v * (rho_l[i] * v_l[i - 1] * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz)
-                - DPcap / dz;
+                - eps_v * (rho_l[i] * v_l[i - 1] * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz
+                - DPcap / dz);
 
             add(D[i], 5, 5,
                 - eps_v * (alpha_l[i] * H(v_l[i])) / dz
@@ -1426,8 +1435,8 @@ int main() {
                 + eps_v * (alpha_l[i] * rho_l[i]) / dt
                 + 2 * eps_v * (rho_l[i] * alpha_l[i] * v_l[i] * H(v_l[i])) / dz
                 + 2 * eps_v * (rho_l[i + 1] * alpha_l[i + 1] * v_l[i + 1] * (1 - H(v_l[i]))) / dz
-                + (fl * rho_l[i] * std::abs(v_l[i]) * H(v_l[i])) / (4 * r_v)
-                + (fl * rho_l[i + 1] * std::abs(v_l[i]) * (1 - H(v_l[i]))) / (4 * r_v));
+                + (Fl * rho_l[i] * std::abs(v_l[i]) * H(v_l[i])) / (4 * r_v)
+                + (Fl * rho_l[i + 1] * std::abs(v_l[i]) * (1 - H(v_l[i]))) / (4 * r_v));
 
             Q[i][6] =
                 + 3 * eps_v * (alpha_l[i] * rho_l[i] * v_l[i]) / dt
@@ -1450,8 +1459,8 @@ int main() {
                 + eps_v * (alpha_l[i + 1] * v_l[i] * v_l[i] * (1 - H(v_l[i]))) / dz);
 
             add(R[i], 6, 3,
-                + eps_v * (rho_l[i + 1] * v_l[i] * v_l[i] * (1 - H(v_l[i]))) / dz)
-                + DPcap / dz;
+                + eps_v * (rho_l[i + 1] * v_l[i] * v_l[i] * (1 - H(v_l[i]))) / dz
+                + DPcap / dz);
 
             add(R[i], 6, 5,
                 + eps_v * (alpha_l[i] * H(v_l[i])) / dz
@@ -1462,7 +1471,7 @@ int main() {
             add(D[i], 7, 0, 
                 -T_m[i] * Rv);
 
-            add(D[i], 7, 4
+            add(D[i], 7, 4,
                 1.0);
 
             add(D[i], 7, 8, 
@@ -1579,20 +1588,20 @@ int main() {
         if (n % 1000 == 0) {
             for (int i = 0; i < N; ++i) {
 
-                v_velocity_output << X[6] << ", ";
-                v_pressure_output << X[4] << ", ";
-                v_temperature_output << X[8] << ", ";
-                v_rho_output << X[0] << ", ";
+                v_velocity_output << X[i][6] << ", ";
+                v_pressure_output << X[i][4] << ", ";
+                v_temperature_output << X[i][8] << ", ";
+                v_rho_output << X[i][0] << ", ";
 
-                l_velocity_output << X[7] << ", ";
-                l_pressure_output << X[5] << ", ";
-                l_temperature_output << X[9] << ", ";
-                l_rho_output << X[1] << ", ";
+                l_velocity_output << X[i][7] << ", ";
+                l_pressure_output << X[i][5] << ", ";
+                l_temperature_output << X[i][9] << ", ";
+                l_rho_output << X[i][1] << ", ";
 
-                w_temperature_output << X[10] << ", ";
+                w_temperature_output << X[i][10] << ", ";
 
-                v_alpha_output << X[2] << ", ";
-                l_alpha_output << X[3] << ", ";
+                v_alpha_output << X[i][2] << ", ";
+                l_alpha_output << X[i][3] << ", ";
             }
 
             v_velocity_output << "\n";
