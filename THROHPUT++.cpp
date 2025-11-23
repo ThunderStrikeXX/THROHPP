@@ -821,7 +821,7 @@ int main() {
     std::ofstream v_alpha_output("results/vapor_alpha.txt", std::ios::trunc);
     std::ofstream l_alpha_output("results/liquid_alpha.txt", std::ios::trunc);
 
-    mesh_io << std::setprecision(8);
+    mesh_io << std::setprecision(4);
 
     v_velocity_output << std::setprecision(4);
     l_pressure_output << std::setprecision(4);
