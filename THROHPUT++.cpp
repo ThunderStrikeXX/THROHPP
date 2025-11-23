@@ -166,7 +166,7 @@ namespace liquid_sodium {
     }
 
     double surf_ten(double T) {
-        return 4.53e-1 - 1.48e-4 * T;
+        return (200.6 - 0.0986 * (T + 273.15)) * 1e-3;
     }
 }
 
@@ -1342,11 +1342,11 @@ int main() {
         const double k_w_lf = 0.5 * (k_w_l + k_w_p);
         const double k_w_rf = 0.5 * (k_w_r + k_w_p);
 
-        add(D[i], 4, 0, -C57 * C64 / C53);
+        add(D[i], 4, 0, - C57 * C64 / C53);
 
-        add(D[i], 4, 8, C56* C64 / C53);
+        add(D[i], 4, 8, - C56 * C64 / C53);
 
-        add(D[i], 4, 9, -C54 * C64 / C53);
+        add(D[i], 4, 9, - C54 * C64 / C53);
 
         add(D[i], 4, 10,
             (rho_w_p* cp_w_p) / dt
