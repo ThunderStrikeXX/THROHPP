@@ -924,6 +924,21 @@ int main() {
         const double Evi1 = 2.0 / 3.0 * (r_i + r_v - 1 / (1 / r_i + 1 / r_v));
         const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
+        const double T_sur = C66 * T_l[i] + C67 * T_w[i] + C68 * T_v[i] + C69 * rho_m[i] + C70;
+
+        const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur);
+        const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));
+
+        if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
+        else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
+        else Omega = 2.0 * b * std::sqrt(M_PI);
+
+        const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);        ///< Useful factor in the coefficients calculation [s / m^2]
+
+        const double bGamma = -(Gamma_xv[i] / (2.0 * T_x_v[i])) + fac * sigma_e * dPsat_dT;   ///< b coefficient [kg/(m3 s K)] 
+        const double aGamma = 0.5 * Gamma_xv[i] + fac * sigma_e * dPsat_dT * T_x_v[i];        ///< a coefficient [kg/(m3 s)]
+        const double cGamma = -fac * sigma_c * Omega;        ///< c coefficient [s/m2]
+
         const double Ex3 = H_xm + (h_vx_x * r_i * r_i) / (2.0 * r_v) * bGamma;
         const double Ex4 =
             -k_x +
@@ -941,16 +956,17 @@ int main() {
         const double gamma = r_i * r_i + ((Ex5 - Evi2 * Ex3) * (Evi1 - r_i)) / (Ex4 - Evi1 * Ex3) - Evi2;
 
         const double C1 = 2 * k_w * (r_o - r_i) * alpha;
+        const double C65 = -C1 * gamma + (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) * k_x - 2 * r_i * k_x;
         const double C2 = (Evi1 - r_i) / (Ex4 - Evi1 * Ex3);
         const double C3 = (C1 + C2 * Ex3) / C65;
         const double C4 = -C1 / C65;
         const double C5 = (-C2 * Ex6 - C2 * Ex7 * rho_m[i] * Rv) / C65;
         const double C6 = (-C2 * Ex7 * Rv * T_m[i]) / C65;
-        const double C7 = (-q_pp + C1 * q_pp * (Eio1 - r_i) - C2 * Ex8 + C2 * Ex7 * rho_m[i] * T_m[i] * Rv) / C65;
+        const double C7 = (-q_pp + C1 * q_pp * (Eio1 - r_i) - C2 * Ex8 + 2 * C2 * Ex7 * rho_m[i] * T_m[i] * Rv) / C65;
         const double C8 = alpha + C2 * Ex3 + alpha * gamma * C3;
         const double C9 = -alpha + alpha * gamma * C4;
         const double C10 = -C2 * Ex6 - C2 * Ex7 * Rv * rho_m[i] + alpha * gamma * C5;
-        const double C11 = -C2 * Ex7 * T_m[i] * Rv + alpha * gamma * C6; 
+        const double C11 = -C2 * Ex7 * T_m[i] * Rv + alpha * gamma * C6;
         const double C12 = alpha * q_pp / k_w * (Eio1 - r_i) - C2 * Ex8 + 2 * C2 * Ex7 * T_m[i] * Rv * rho_m[i] + alpha * gamma * C7;
         const double C13 = -2 * r_o * C8;
         const double C14 = -2 * r_o * C9;
@@ -965,7 +981,7 @@ int main() {
         const double C23 = C18 * C12 - Eio1 * q_pp / k_w;
         const double C24 = 1.0 / (Ex4 - Evi1 * Ex3);
         const double C25 = Ex5 - Evi2 * Ex3;
-        const double C26 = C24 * Ex3 - C25 * C24 * C3;
+        const double C26 = -C24 * Ex3 - C25 * C24 * C3;
         const double C27 = -C25 * C24 * C4;
         const double C28 = C24 * Ex6 + C24 * Ex7 * Rv * rho_m[i] - C25 * C24 * C5;
         const double C29 = C24 * Ex7 * Rv * T_m[i] - C25 * C24 * C6;
@@ -975,6 +991,12 @@ int main() {
         const double C33 = -Evi1 * C28 - Evi2 * C5;
         const double C34 = -Evi1 * C29 - Evi2 * C6;
         const double C35 = -Evi1 * C30 - Evi2 * C7;
+        const double C66 = C31 + r_v * C26 + r_v * r_v * C3;
+        const double C67 = C32 + r_v * C27 + r_v * r_v * C4;
+        const double C68 = C33 + r_v * C28 + r_v * r_v * C5;
+        const double C69 = C34 + r_v * C29 + r_v * r_v * C6;
+        const double C70 = C35 + r_v * C30 + r_v * r_v * C7;
+
         const double C36 = bGamma * C31 + bGamma * r_v * C26 + bGamma * r_v * r_v * C3;
         const double C37 = bGamma * C32 + bGamma * r_v * C27 + bGamma * r_v * r_v * C4;
         const double C38 = bGamma * C33 + bGamma * r_v * C28 + bGamma * r_v * r_v * C5 + cGamma * Rv * rho_m[i];
@@ -1004,27 +1026,6 @@ int main() {
         const double C62 = -1.0 / Tc * (C60 + C61 / (2 * std::sqrt(1 - T_l[i] / Tc)));
         const double C63 = C59 + C60 * (1.0 - T_l[i] / Tc) + C61 * std::sqrt(1.0 - T_l[i] / Tc) + T_l[i] / Tc * (C60 + C61 / (2 * std::sqrt(1.0 - T_l[i] / Tc)));
         const double C64 = -k_w * 2 * r_i / (r_o * r_o - r_i * r_i);
-        const double C65 = -C1 * gamma + (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) * k_x - 2 * r_i * k_x;
-        const double C66 = C31 + r_v * C26 + r_v * r_v * C3;
-        const double C67 = C32 + r_v * C27 + r_v * r_v * C4;
-        const double C68 = C33 + r_v * C28 + r_v * r_v * C5;
-        const double C69 = C34 + r_v * C29 + r_v * r_v * C6;
-        const double C70 = C35 + r_v * C30 + r_v * r_v * C7;
-
-        const double T_sur = C66 * T_l[i] + C67 * T_w[i] + C68 * T_v[i] + C69 * rho_m[i] + C70;
-
-        const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur);
-        const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));
-
-        if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
-        else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
-        else Omega = 2.0 * b * std::sqrt(M_PI);
-
-        const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);        ///< Useful factor in the coefficients calculation [s / m^2]
-
-        const double bGamma = -(Gamma_xv[i] / (2.0 * T_x_v[i])) + fac * sigma_e * dPsat_dT;   ///< b coefficient [kg/(m3 s K)] 
-        const double aGamma = 0.5 * Gamma_xv[i] + fac * sigma_e * dPsat_dT * T_x_v[i];        ///< a coefficient [kg/(m3 s)]
-        const double cGamma = -fac * sigma_c * Omega;                                         ///< c coefficient [s/m2]
 
         // DPcap evaluation
 
