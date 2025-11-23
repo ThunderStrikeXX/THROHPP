@@ -900,14 +900,7 @@ int main() {
         const double Psat = vapor_sodium::P_sat(T_x_v[i]);                  ///< Saturation pressure [Pa]         
         const double dPsat_dT = 
             Psat * std::log(10.0) * (7740.0 / (T_x_v[i] * T_x_v[i]));       ///< Derivative of the saturation pressure wrt T [Pa/K]   
-        const double beta = 1.0 / std::sqrt();                  
-        const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);        ///< Useful factor in the coefficients calculation [s / m^2]
-        const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));
-
-        if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
-        else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
-        else Omega = 2.0 * b * std::sqrt(M_PI);
-
+        
         double h_xv_v;      ///< Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
         double h_vx_x;      ///< Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
@@ -925,10 +918,6 @@ int main() {
             h_vx_x = liquid_sodium::h(T_x_v[i])
                 + (vapor_sodium::h(T_v_bulk[i]) - vapor_sodium::h(T_x_v[i]));
         }
-
-        const double bGamma = -(Gamma_xv[i] / (2.0 * T_x_v[i])) + fac * sigma_e * dPsat_dT;   ///< b coefficient [kg/(m3 s K)] 
-        const double aGamma = 0.5 * Gamma_xv[i] + fac * sigma_e * dPsat_dT * T_x_v[i];        ///< a coefficient [kg/(m3 s)]
-        const double cGamma = -fac * sigma_c * Omega;                                         ///< c coefficient [s/m2]
 
         const double Eio1 = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));
         const double Eio2 = 0.5 * (r_o * r_o + r_i * r_i);
@@ -1016,6 +1005,26 @@ int main() {
         const double C63 = C59 + C60 * (1.0 - T_l[i] / Tc) + C61 * std::sqrt(1.0 - T_l[i] / Tc) + T_l[i] / Tc * (C60 + C61 / (2 * std::sqrt(1.0 - T_l[i] / Tc)));
         const double C64 = -k_w * 2 * r_i / (r_o * r_o - r_i * r_i);
         const double C65 = -C1 * gamma + (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) * k_x - 2 * r_i * k_x;
+        const double C66 = C31 + r_v * C26 + r_v * r_v * C3;
+        const double C67 = C32 + r_v * C27 + r_v * r_v * C4;
+        const double C68 = C33 + r_v * C28 + r_v * r_v * C5;
+        const double C69 = C34 + r_v * C29 + r_v * r_v * C6;
+        const double C70 = C35 + r_v * C30 + r_v * r_v * C7;
+
+        const double T_sur = C66 * T_l[i] + C67 * T_w[i] + C68 * T_v[i] + C69 * rho_m[i] + C70;
+
+        const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur);
+        const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_v_bulk[i]))));
+
+        if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
+        else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
+        else Omega = 2.0 * b * std::sqrt(M_PI);
+
+        const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);        ///< Useful factor in the coefficients calculation [s / m^2]
+
+        const double bGamma = -(Gamma_xv[i] / (2.0 * T_x_v[i])) + fac * sigma_e * dPsat_dT;   ///< b coefficient [kg/(m3 s K)] 
+        const double aGamma = 0.5 * Gamma_xv[i] + fac * sigma_e * dPsat_dT * T_x_v[i];        ///< a coefficient [kg/(m3 s)]
+        const double cGamma = -fac * sigma_c * Omega;                                         ///< c coefficient [s/m2]
 
         // DPcap evaluation
 
