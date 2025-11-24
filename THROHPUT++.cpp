@@ -1184,16 +1184,16 @@ int main() {
             const double k_m_r = vapor_sodium::k(T_m[i + 1], p_m[i + 1]);
 
             add(D[i], 2, 0,
-                (alpha_m[i] * T_m[i] * cp_m_p) / dt
+                + (alpha_m[i] * cp_m_p * T_m[i]) / dt
                 + (alpha_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i])) / dz
                 - (alpha_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1]))) / dz
                 - C45 - h_xv_v * C39
             );
 
             add(D[i], 2, 2,
-                (T_m[i] * rho_m[i] * cp_m_p) / dt
+                + (T_m[i] * rho_m[i] * cp_m_p) / dt
                 + (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i])) / dz
-                - rho_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1])) / dz
+                - (rho_m[i] * cp_m_p * T_m[i] * v_m[i] * (1 - H(v_m[i - 1]))) / dz
                 + p_m[i] * (v_m[i] * H(v_m[i]) + v_m[i - 1] * H(v_m[i - 1])) / dz
                 + p_m[i] / dt
             );
@@ -1221,7 +1221,7 @@ int main() {
             );
 
             Q[i][2] = 
-                + 3 * (alpha_m[i] * T_m[i] * cp_m_p * rho_m[i]) / dt 
+                + 3 * (alpha_m[i] * cp_m_p * T_m[i] * rho_m[i]) / dt
                 + 3 * ( 
                     + alpha_m[i] * rho_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i]) 
                     + alpha_m[i + 1] * rho_m[i + 1] * cp_m_r * T_m[i + 1] * v_m[i + 1] * (1 - H(v_m[i]))
@@ -1242,8 +1242,8 @@ int main() {
             );
 
             add(L[i], 2, 2,
-                + (rho_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz
-                + p_m[i] * (v_m[i - 1] * H(v_m[i - 1])) / dz
+                - (rho_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz
+                - p_m[i] * (v_m[i - 1] * H(v_m[i - 1])) / dz
             );
 
             add(L[i], 2, 6,
@@ -1329,7 +1329,7 @@ int main() {
 
             Q[i][3] = 
                 + eps_v * 3 * ( 
-                    alpha_l[i] * T_l[i] * cp_l_p * rho_l[i]) / dt
+                    + alpha_l[i] * T_l[i] * cp_l_p * rho_l[i]) / dt
                 + eps_v * 3 * (
                     + alpha_l[i] * rho_l[i] * cp_l_p * T_l[i] * v_l[i] * H(v_l[i])
                     + alpha_l[i + 1] * rho_l[i + 1] * cp_l_r * T_l[i + 1] * v_l[i + 1] * (1 - H(v_l[i]))
@@ -1346,12 +1346,12 @@ int main() {
                 + C52 + C58 + h_vx_x * C40;
 
             add(L[i], 3, 1,
-                - eps_v * (alpha_l[i - 1] * cp_l_l * T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1]) / dz)
+                - eps_v * (alpha_l[i - 1] * cp_l_l * T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz
             );
 
             add(L[i], 3, 3,
-                + eps_v * (rho_l[i - 1] * cp_l_l* T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz
-                + eps_v * (p_l[i] * v_l[i - 1] * H(v_l[i - 1])) / dz
+                - eps_v * (rho_l[i - 1] * cp_l_l * T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz
+                - eps_v * (p_l[i] * v_l[i - 1] * H(v_l[i - 1])) / dz
             );
 
             add(L[i], 3, 7,
@@ -1376,7 +1376,7 @@ int main() {
             );
 
             add(R[i], 3, 9,
-                + eps_v * (alpha_l[i + 1] * rho_l[i + 1] * cp_l_r* v_l[i] * (1 - H(v_l[i]))) / dz
+                + eps_v * (alpha_l[i + 1] * rho_l[i + 1] * cp_l_r * v_l[i] * (1 - H(v_l[i]))) / dz
                 - eps_v * (alpha_l[i] * k_l_p * H(v_l[i]) + alpha_l[i + 1] * k_l_r * (1 - H(v_l[i]))) / (dz * dz)
             );
 
