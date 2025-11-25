@@ -495,6 +495,7 @@ double invert(double L_target) {
 
 #pragma region solving_functions
 
+// Definition of data structures 
 struct SparseBlock {
     std::vector<int> row;
     std::vector<int> col;
@@ -506,6 +507,7 @@ using VecBlock = std::array<double, B>;
 
 // ------------------------- Utility dense -------------------------
 
+// Converts a sparse matrix S to a dense matrix M
 DenseBlock to_dense(const SparseBlock& S) {
     DenseBlock M{};
     for (std::size_t k = 0; k < S.val.size(); ++k) {
@@ -516,6 +518,7 @@ DenseBlock to_dense(const SparseBlock& S) {
     return M;
 }
 
+// Executes the application of a dense matrix A to a vector x to get a vector y
 void matvec(const DenseBlock& A, const double x[B], double y[B]) {
     for (int i = 0; i < B; ++i) {
         double s = 0.0;
@@ -525,6 +528,7 @@ void matvec(const DenseBlock& A, const double x[B], double y[B]) {
     }
 }
 
+// Executes the multiplication between a dense matrix A and a dense matrix B to get a dense matrix C
 void matmul(const DenseBlock& A, const DenseBlock& Bm, DenseBlock& C) {
     for (int i = 0; i < B; ++i)
         for (int j = 0; j < B; ++j) {
@@ -535,20 +539,23 @@ void matmul(const DenseBlock& A, const DenseBlock& Bm, DenseBlock& C) {
         }
 }
 
+// Executes the subtraction of a matrix Bm from a matrix A
 void subtract_inplace(DenseBlock& A, const DenseBlock& Bm) {
     for (int i = 0; i < B; ++i)
         for (int j = 0; j < B; ++j)
             A[i][j] -= Bm[i][j];
 }
 
-// ------------------------- LU con pivoting -------------------------
+// ------------------------- LU with pivoting -------------------------
 
+// In-place LU factorization with partial pivoting, storing L below and U on/above the diagonal.
 void lu_factor(DenseBlock& A, std::array<int, B>& piv) {
     for (int i = 0; i < B; ++i)
         piv[i] = i;
 
     for (int k = 0; k < B; ++k) {
-        // pivot
+
+        // Pivot
         int p = k;
         double maxv = std::fabs(A[k][k]);
         for (int i = k + 1; i < B; ++i) {
@@ -558,16 +565,18 @@ void lu_factor(DenseBlock& A, std::array<int, B>& piv) {
                 p = i;
             }
         }
-        if (maxv == 0.0)
-            throw std::runtime_error("LU: matrice singolare");
 
+        if (maxv == 0.0)
+            throw std::runtime_error("LU: singular matrix");
+
+        // Rows swapping
         if (p != k) {
             std::swap(piv[k], piv[p]);
             for (int j = 0; j < B; ++j)
                 std::swap(A[k][j], A[p][j]);
         }
 
-        // eliminazione
+        // Elimination
         for (int i = k + 1; i < B; ++i) {
             A[i][k] /= A[k][k];
             double lik = A[i][k];
@@ -577,9 +586,11 @@ void lu_factor(DenseBlock& A, std::array<int, B>& piv) {
     }
 }
 
+// Solves Ax = b using the in-place LU factorization (with pivoting) via forward and backward substitution.
 void lu_solve_vec(const DenseBlock& LU, const std::array<int, B>& piv,
     const double b_in[B], double x[B]) {
-    // applica pivot a b
+
+    // Applies pivot to b
     double y[B];
     for (int i = 0; i < B; ++i)
         y[i] = b_in[piv[i]];
@@ -598,9 +609,10 @@ void lu_solve_vec(const DenseBlock& LU, const std::array<int, B>& piv,
     }
 }
 
+// Solves LU·X = P·B column-wise by applying the LU-based vector solver to each column of B.
 void lu_solve_mat(const DenseBlock& LU, const std::array<int, B>& piv,
     const DenseBlock& Bm, DenseBlock& X) {
-    // risolve LU X = P B (colonna per colonna)
+
     for (int col = 0; col < B; ++col) {
         double b_col[B];
         double x_col[B];
@@ -617,11 +629,8 @@ void lu_solve_mat(const DenseBlock& LU, const std::array<int, B>& piv,
 
 // ------------------------- Solve block-tridiagonal -------------------------
 
-// L[i]: blocco sinistro (i>=1)
-// D[i]: blocco diagonale
-// R[i]: blocco destro (i<=Nx-2)
-// Q[i]: termini noti di blocco (dimensione B)
-// X[i]: soluzione per blocco i
+
+// Block Thomas solver: performs forward elimination and back substitution on a block-tridiagonal system using per-block LU factorizations.
 void solve_block_tridiag(
     const std::vector<SparseBlock>& L,
     const std::vector<SparseBlock>& D,
@@ -632,7 +641,7 @@ void solve_block_tridiag(
     if (Nx == 0)
         return;
 
-    // copia dense dei blocchi
+    // Dense copy of the blocks
     std::vector<DenseBlock> Dd(Nx);
     std::vector<DenseBlock> Ld(Nx);
     std::vector<DenseBlock> Rd(Nx);
@@ -643,8 +652,8 @@ void solve_block_tridiag(
         if (i < Nx - 1)  Rd[i] = to_dense(R[i]);
     }
 
-    std::vector<VecBlock> Qm = Q;             // Q modificato durante forward
-    X.assign(Nx, VecBlock{});                 // soluzione
+    std::vector<VecBlock> Qm = Q;             // Q changed during forward
+    X.assign(Nx, VecBlock{});                 // Solution
 
     std::vector<std::array<int, B>> piv(Nx);
     std::vector<bool> factored(Nx, false);
@@ -683,7 +692,7 @@ void solve_block_tridiag(
 
     // -------- Backward substitution --------
 
-    // ultimo blocco
+    // Last block
     if (!factored[Nx - 1]) {
         lu_factor(Dd[Nx - 1], piv[Nx - 1]);
         factored[Nx - 1] = true;
@@ -698,7 +707,7 @@ void solve_block_tridiag(
             X[Nx - 1][k] = sol[k];
     }
 
-    // blocchi precedenti
+    // Previous blocks
     for (int i = Nx - 2; i >= 0; --i) {
         if (!factored[i]) {
             lu_factor(Dd[i], piv[i]);
@@ -719,6 +728,7 @@ void solve_block_tridiag(
     }
 }
 
+// Add triplet to sparse block
 auto add = [&](SparseBlock& B, int p, int q, double v) {
     B.row.push_back(p);
     B.col.push_back(q);
@@ -749,16 +759,16 @@ int main() {
     const double T_env = 280.0;             ///< External environmental temperature [K]
 
     // Evaporation and condensation parameters
-    const double eps_s = 1.0;                                           ///< Surface fraction of the wick available for phasic interface [-]
-    const double sigma_e = 1.0;                                         ///< Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 1.0;                                         ///< Condensation accomodation coefficient [-]. 1 means optimal condensation
-    double Omega = 1.0;
+    const double eps_s = 1.0;               ///< Surface fraction of the wick available for phasic interface [-]
+    const double sigma_e = 1.0;             ///< Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 1.0;             ///< Condensation accomodation coefficient [-]. 1 means optimal condensation
+    double Omega = 1.0;                     ///< Omega factor initialization
 
     const double Tc = 2509.46;
     double const eps_v = 1.0;
 
     // Geometric parameters
-    const int N = 10;                                                         ///< Number of axial nodes [-]
+    const int N = 10;                                                           ///< Number of axial nodes [-]
     const double l = 0.982; 			                                        ///< Length of the heat pipe [m]
     const double dz = l / N;                                                    ///< Axial discretization step [m]
     const double evaporator_length = 0.502;                                     ///< Evaporator length [m]
@@ -767,48 +777,48 @@ int main() {
     const double evaporator_nodes = std::floor(evaporator_length / dz);         ///< Number of evaporator nodes
     const double condenser_nodes = std::ceil(condenser_length / dz);            ///< Number of condenser nodes
     const double adiabatic_nodes = N - (evaporator_nodes + condenser_nodes);    ///< Number of adiabatic nodes
-    const double r_o = 0.01335;                                             ///< Outer wall radius [m]
-    const double r_i = 0.0112;                                          ///< Wall-wick interface radius [m]
-    const double r_v = 0.01075;                                             ///< Vapor-wick interface radius [m]
+    const double r_o = 0.01335;                                                 ///< Outer wall radius [m]
+    const double r_i = 0.0112;                                                  ///< Wall-wick interface radius [m]
+    const double r_v = 0.01075;                                                 ///< Vapor-wick interface radius [m]
 
     // Surfaces 
-    const double A_w_outer = 2 * M_PI * r_o * dz;                                       ///< Wall radial area (at r_o) [m^2]
-    const double A_w_cross = M_PI * (r_o * r_o - r_i * r_i);        ///< Wall cross-sectional area [m^2]
-    const double A_x_interface = 2 * M_PI * r_i * dz;                               ///< Wick radial area (at r_i) [m^2]
-    const double A_x_cross = M_PI * (r_i * r_i - r_v * r_v);        ///< Wick cross-sectional area [m^2]
-    const double A_v_inner = 2 * M_PI * r_v * dz;                                       ///< Vapor radial area (at r_v) [m^2]
-    const double A_v_cross = M_PI * r_v * r_v;                                      ///< Vapor cross-sectional area [m^2]
+    const double A_w_outer = 2 * M_PI * r_o * dz;                               ///< Wall radial area (at r_o) [m^2]
+    const double A_w_cross = M_PI * (r_o * r_o - r_i * r_i);                    ///< Wall cross-sectional area [m^2]
+    const double A_x_interface = 2 * M_PI * r_i * dz;                           ///< Wick radial area (at r_i) [m^2]
+    const double A_x_cross = M_PI * (r_i * r_i - r_v * r_v);                    ///< Wick cross-sectional area [m^2]
+    const double A_v_inner = 2 * M_PI * r_v * dz;                               ///< Vapor radial area (at r_v) [m^2]
+    const double A_v_cross = M_PI * r_v * r_v;                                  ///< Vapor cross-sectional area [m^2]
 
     // Time-stepping parameters
-    double dt = 1e-6;                               ///< Initial time step [s] (then it is updated according to the limits)
-    const int tot_iter = 100000;                          ///< Number of timesteps
-    const double time_total = tot_iter * dt;          ///< Total simulation time [s]
+    double dt = 1e-6;                                   ///< Initial time step [s] (then it is updated according to the limits)
+    const int tot_iter = 100000;                        ///< Number of timesteps
+    const double time_total = tot_iter * dt;            ///< Total simulation time [s]
 
     // Wick permeability parameters
-    const double K = 1e-4;                          ///< Permeability [m^2]
-    const double CF = 0.0;                          ///< Forchheimer coefficient [1/m]
+    const double K = 1e-10;                             ///< Permeability [m^2]
+    const double CF = 1e5;                              ///< Forchheimer coefficient [1/m]
 
     // Mesh z positions
     std::vector<double> mesh(N, 0.0);
-    for (int i = 0; i < N; ++i) mesh[i] = i * dz;
+    for (int i = 0; i < N; ++i) mesh[i] = i * dz;       ///< Mesh discretization
 
     // Node partition
     const int N_e = static_cast<int>(std::floor(evaporator_length / dz));   ///< Number of nodes of the evaporator region [-]
     const int N_c = static_cast<int>(std::ceil(condenser_length / dz));     ///< Number of nodes of the condenser region [-]
     const int N_a = N - (N_e + N_c);                                        ///< Number of nodes of the adiabadic region [-]
 
-    const double T_full = 800.0;
+    const double T_full = 800.0;                                            ///< Uniform temperature initialization [K]
 
-    const double q_pp = power / (2 * M_PI * evaporator_length * r_o);     ///< Heat flux at evaporator from given power [W/m^2]
+    const double q_pp = power / (2 * M_PI * evaporator_length * r_o);       ///< Heat flux at evaporator from given power [W/m^2]
 
     // Mass sources/fluxes
-    std::vector<double> phi_x_v(N, 0.0);            ///< Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
+    std::vector<double> phi_x_v(N, 0.0);                ///< Mass flux [kg/m2/s] at the wick-vapor interface (positive if evaporation)
 
     // Create result folder
     std::filesystem::create_directories("results");
 
     // Print results in file
-    std::ofstream mesh_io("mesh.txt", std::ios::trunc);
+    std::ofstream mesh_output("mesh.txt", std::ios::trunc);
 
     std::ofstream v_velocity_output("results/vapor_velocity.txt", std::ios::trunc);
     std::ofstream v_pressure_output("results/vapor_pressure.txt", std::ios::trunc);
@@ -825,7 +835,7 @@ int main() {
     std::ofstream v_alpha_output("results/vapor_alpha.txt", std::ios::trunc);
     std::ofstream l_alpha_output("results/liquid_alpha.txt", std::ios::trunc);
 
-    mesh_io << std::setprecision(4);
+    mesh_output << std::setprecision(4);
 
     v_velocity_output << std::setprecision(4);
     v_pressure_output << std::setprecision(4);
@@ -842,11 +852,10 @@ int main() {
     v_alpha_output << std::setprecision(4);
     l_alpha_output << std::setprecision(4);
    
-    for (int i = 0; i < N; ++i) {
-        mesh_io << i * dz << " ";
-    }
+    for (int i = 0; i < N; ++i) mesh_output << i * dz << " ";
 
-    mesh_io.flush();
+    mesh_output.flush();
+    mesh_output.close();
 
     #pragma endregion
 
@@ -887,9 +896,9 @@ int main() {
             const double Re_v = rho_m[i] * std::fabs(v_m[i]) * Dh_v / mu_v;     ///< Reynolds number [-]
             const double Pr_v = cp_m * mu_v / k_m;                              ///< Prandtl number [-]
             const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);    ///< Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-            const double Psat = vapor_sodium::P_sat(T_m[i]);                  ///< Saturation pressure [Pa]         
+            const double Psat = vapor_sodium::P_sat(T_sur[i]);                  ///< Saturation pressure [Pa]         
             const double dPsat_dT = 
-                Psat * std::log(10.0) * (7740.0 / (T_m[i] * T_m[i]));       ///< Derivative of the saturation pressure wrt T [Pa/K]   
+                Psat * std::log(10.0) * (7740.0 / (T_sur[i] * T_sur[i]));       ///< Derivative of the saturation pressure wrt T [Pa/K]   
         
             double h_xv_v;      ///< Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
             double h_vx_x;      ///< Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
@@ -897,16 +906,16 @@ int main() {
             if (phi_x_v[i] >= 0.0) {
 
                 // Evaporation case
-                h_xv_v = vapor_sodium::h(T_m[i]);
-                h_vx_x = liquid_sodium::h(T_l[i]);
+                h_xv_v = vapor_sodium::h(T_sur[i]);
+                h_vx_x = liquid_sodium::h(T_sur[i]);
 
             }
             else {
 
                 // Condensation case
                 h_xv_v = vapor_sodium::h(T_m[i]);
-                h_vx_x = liquid_sodium::h(T_l[i])
-                    + (vapor_sodium::h(T_m[i]) - vapor_sodium::h(T_l[i]));
+                h_vx_x = liquid_sodium::h(T_sur[i])
+                    + (vapor_sodium::h(T_m[i]) - vapor_sodium::h(T_sur[i]));
             }
 
             const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur[i]);
@@ -1750,4 +1759,19 @@ int main() {
             l_alpha_output.flush();
         }
     }
+
+    v_velocity_output.close();
+    v_pressure_output.close();
+    v_temperature_output.close();
+    v_rho_output.close();
+
+    l_velocity_output.close();
+    l_pressure_output.close();
+    l_temperature_output.close();
+    l_rho_output.close();
+
+    w_temperature_output.close();
+
+    v_alpha_output.close();
+    l_alpha_output.close();
 }
