@@ -1162,7 +1162,7 @@ int main() {
 
             add(L[i], 1, 7,
                 - eps_v * (alpha_l[i - 1] * rho_l[i - 1] * H(v_l[i - 1])) / dz
-                - eps_v * (alpha_l[i] * rho_l[i] * (1 - H(v_l[i - 1]))) / dz
+                + eps_v * (alpha_l[i] * rho_l[i] * (1 - H(v_l[i - 1]))) / dz
             );
 
             add(R[i], 1, 1,
