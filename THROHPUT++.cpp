@@ -1047,7 +1047,7 @@ int main() {
                 alpha_m[i] / dt
                 + (alpha_m[i] * v_m[i] * H(v_m[i])) / dz
                 - (alpha_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz
-                - 0 * C39
+                - C39
             );
 
             add(D[i], 0, 2,
@@ -1062,19 +1062,19 @@ int main() {
             );
 
             add(D[i], 0, 8, 
-                - 0 * C38
+                - C38
             );
 
             add(D[i], 0, 9, 
-                - 0 * C36
+                - C36
             );
 
             add(D[i], 0, 10, 
-                - 0 * C37
+                - C37
             );
 
             Q[i][0] = 
-                + 0 * C40  
+                + C40  
                 + 2 * ( 
                     + alpha_m[i] * rho_m[i] * v_m[i] * H(v_m[i])
                     + alpha_m[i + 1] * rho_m[i + 1] * v_m[i] * (1 - H(v_m[i]))
@@ -1107,7 +1107,7 @@ int main() {
             // Mass liquid equation
 
             add(D[i], 1, 0, 
-                + 0 * C39
+                + C39
             );
 
             add(D[i], 1, 1,
@@ -1128,20 +1128,20 @@ int main() {
             );
 
             add(D[i], 1, 8, 
-                + 0 * C38
+                + C38
             );
 
             add(D[i], 1, 9, 
-                + 0 * C36
+                + C36
             );
 
             add(D[i], 1, 10, 
-                + 0 * C37
+                + C37
             );
 
 
             Q[i][1] = 
-                - 0 * C40
+                - C40
                 + 2 * (
                     + eps_v * (alpha_l[i] * rho_l[i] * v_l[i] * H(v_l[i]))
                     + eps_v * (alpha_l[i + 1] * rho_l[i + 1] * v_l[i] * (1 - H(v_l[i])))
@@ -1187,7 +1187,7 @@ int main() {
                 + (alpha_m[i] * cp_m_p * T_m[i]) / dt
                 + (alpha_m[i] * cp_m_p * T_m[i] * v_m[i] * H(v_m[i])) / dz
                 - (alpha_m[i] * cp_m_p * T_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz
-                - 0 * C45 - 0 * h_xv_v * C39
+                - C45 - h_xv_v * C39
             );
 
             add(D[i], 2, 2,
@@ -1209,15 +1209,15 @@ int main() {
                 - (alpha_m[i] * rho_m[i] * cp_m_p * v_m[i - 1] * (1 - H(v_m[i - 1]))) / dz
                 + (alpha_m[i] * k_m_p * H(v_m[i]) + alpha_m[i + 1] * k_m_r * (1 - H(v_m[i]))) / (dz * dz)
                 + (alpha_m[i - 1] * k_m_l * H(v_m[i - 1]) + alpha_m[i] * k_m_p * (1 - H(v_m[i - 1]))) / (dz * dz)
-                - 0 * C44 - 0 * h_xv_v * C38
+                - C44 - h_xv_v * C38
             );
 
             add(D[i], 2, 9, 
-                - 0 * C42 - 0 * h_vx_x * C36
+                - C42 - h_vx_x * C36
             );
 
             add(D[i], 2, 10, 
-                - 0 * C43 - 0 * h_xv_v * C37
+                - C43 - h_xv_v * C37
             );
 
             Q[i][2] = 
@@ -1235,7 +1235,7 @@ int main() {
                     - alpha_m[i] * v_m[i - 1] * (1 - H(v_m[i - 1]))
                     ) / dz
                 + p_m[i] * alpha_m[i] / dt
-                + 0 * C46 + 0 * h_xv_v * C40;
+                + C46 + h_xv_v * C40;
 
             add(L[i], 2, 0,
                 - (alpha_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz
@@ -1287,7 +1287,7 @@ int main() {
             const double k_l_r = liquid_sodium::k(T_l[i + 1]);
 
             add(D[i], 3, 0, 
-                - 0 * C57 - 0 * h_xv_v * C39 - 0 * C51
+                - C57 - h_xv_v * C39 - C51
             );
 
             add(D[i], 3, 1,
@@ -1310,7 +1310,7 @@ int main() {
             );
 
             add(D[i], 3, 8, 
-                - 0 * C56 - 0 * h_vx_x * C38 - 0 * C50
+                - C56 - h_vx_x * C38 - C50
             );
 
             add(D[i], 3, 9,
@@ -1319,12 +1319,12 @@ int main() {
                 - eps_v * (alpha_l[i] * rho_l[i] * cp_l_p * v_l[i - 1] * (1 - H(v_l[i - 1]))) / dz
                 + eps_v * (alpha_l[i] * k_l_p * H(v_l[i]) + alpha_l[i + 1] * k_l_r * (1 - H(v_l[i]))) / (dz * dz)
                 + eps_v * (alpha_l[i - 1] * k_l_l * H(v_l[i - 1]) + alpha_l[i] * k_l_p * (1 - H(v_l[i - 1]))) / (dz * dz)
-                - 0 * C44 - 0 * h_xv_v * C38
-                - 0 * C54 - 0 * C48 - 0 * h_vx_x * C36
+                - C44 - h_xv_v * C38
+                - C54 - C48 - h_vx_x * C36
             );
 
             add(D[i], 3, 10, 
-                - 0 * C55 - 0 * h_vx_x * C37 - 0 * C49
+                - C55 - h_vx_x * C37 - C49
             );
 
             Q[i][3] = 
@@ -1343,7 +1343,7 @@ int main() {
                         - alpha_l[i] * v_l[i - 1] * (1 - H(v_l[i - 1]))
                         ) / dz
                 + eps_v * p_l[i] * alpha_l[i] / dt
-                + 0 * C52 + 0 * C58 + 0 * h_vx_x * C40;   // QUESTA RIGA FA SALIRE LA TEMP DEL LIQUIDO
+                + C52 + C58 + h_vx_x * C40;
 
             add(L[i], 3, 1,
                 - eps_v * (alpha_l[i - 1] * cp_l_l * T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz
@@ -1421,11 +1421,11 @@ int main() {
                 + C58 * C64 / C53;
 
             add(L[i], 4, 10,
-                -k_w_lf / (dz * dz)
+                - k_w_lf / (dz * dz)
             );
 
             add(R[i], 4, 10,
-                -k_w_rf / (dz * dz)
+                - k_w_rf / (dz * dz)
             );
 
             // Momentum mixture equation
