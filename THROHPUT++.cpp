@@ -795,8 +795,8 @@ int main() {
     const double time_total = tot_iter * dt;            ///< Total simulation time [s]
 
     // Wick permeability parameters
-    const double K = 1e-10;                             ///< Permeability [m^2]
-    const double CF = 1e5;                              ///< Forchheimer coefficient [1/m]
+    const double K = 1e-8;                             ///< Permeability [m^2]
+    const double CF = 1e4;                              ///< Forchheimer coefficient [1/m]
 
     // Mesh z positions
     std::vector<double> mesh(N, 0.0);
