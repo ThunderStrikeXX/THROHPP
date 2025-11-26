@@ -768,7 +768,7 @@ int main() {
     double const eps_v = 1.0;
 
     // Geometric parameters
-    const int N = 10;                                                           ///< Number of axial nodes [-]
+    const int N = 50;                                                           ///< Number of axial nodes [-]
     const double l = 0.982; 			                                        ///< Length of the heat pipe [m]
     const double dz = l / N;                                                    ///< Axial discretization step [m]
     const double evaporator_length = 0.502;                                     ///< Evaporator length [m]
@@ -946,7 +946,7 @@ int main() {
             }
 
             const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur[i]);
-            const double b = std::abs(-phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_m[i]))));
+            const double b = -phi_x_v[i] / (p_m[i] * std::sqrt(2.0 / (Rv * T_m[i])));
 
             if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
             else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
@@ -980,7 +980,7 @@ int main() {
 			const double C7 = (2 * k_w * (r_o - r_i) * alpha * C2 + k_x * Ex6 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
 			const double C8 = (2 * k_w * (r_o - r_i) * alpha * C3 - k_x * Ex3 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
 			const double C9 = (2 * k_w * (r_o - r_i) * alpha * C4) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-			const double C10 = (- q_pp + 2 * k_w * (r_o - r_i) * alpha * C5 + k_x * Ex8 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_w * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+			const double C10 = (- q_pp + 2 * k_w * (r_o - r_i) * alpha * C5 + k_x * Ex8 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
 
             // c_w coefficients
 			const double C11 = alpha * (C1 + gamma * C6);
@@ -991,10 +991,10 @@ int main() {
 
 			// b_w coefficients
 			const double C16 = - 2 * r_o * C11;
-			const double C17 = -2 * r_o * C12;
-			const double C18 = -2 * r_o * C13;
-			const double C19 = -2 * r_o * C14;
-			const double C20 = -2 * r_o * C15 + q_pp / k_w;
+			const double C17 = - 2 * r_o * C12;
+			const double C18 = - 2 * r_o * C13;
+			const double C19 = - 2 * r_o * C14;
+			const double C20 = - 2 * r_o * C15 + q_pp / k_w;
 
 			// a_w coefficients
 			const double C21 = (2 * r_o * Eio1 - Eio2) * C11;
@@ -1101,7 +1101,6 @@ int main() {
 
                     DPcap = 2 * surf_ten_value / r_p *
                         (mu + (9 * r_v) / (2 * eps_s * alpha_m0 * r_p) * (std::pow(1 - mu * mu, -0.5) - Lambda / mu));
-
                 }
             }
 
@@ -1137,7 +1136,7 @@ int main() {
             );
 
             add(D[i], 0, 10, 
-                -C44
+                - C44
             );
 
             Q[i][0] = 
@@ -1482,7 +1481,6 @@ int main() {
 
             add(D[i], 4, 10,
                 + (rho_w_p * cp_w_p) / dt
-                - (C55 / C53) * C64
                 + (k_w_lf + k_w_rf) / (dz * dz)
                 - C74
             );
@@ -1685,7 +1683,7 @@ int main() {
             heat_source_liquid_vapor_phase[i] = C61 * p_m[i] + C62 * T_m[i] + C63 * T_l[i] + C64 * T_w[i] + C65;
 
             heat_source_vapor_liquid_flux[i] = C46 * p_m[i] + C47 * T_m[i] + C48 * T_l[i] + C49 * T_w[i] + C50;
-            heat_source_liquid_vapor_flux[i] = C51 * p_m[i] + C52 * T_m[i] + C53 * T_l[i] + C54 * T_w[i] + C65;
+            heat_source_liquid_vapor_flux[i] = C51 * p_m[i] + C52 * T_m[i] + C53 * T_l[i] + C54 * T_w[i] + C55;
 
             p_saturation[i] = Psat;
         }
