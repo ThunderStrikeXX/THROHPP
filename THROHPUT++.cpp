@@ -771,7 +771,7 @@ int main() {
 	const double tolerance = 1e-4;			///< Tolerance for the convergence of Picard loop [-]
 
     // Geometric parameters
-    const int N = 100;                                                           ///< Number of axial nodes [-]
+    const int N = 20;                                                           ///< Number of axial nodes [-]
     const double l = 0.982; 			                                        ///< Length of the heat pipe [m]
     const double dz = l / N;                                                    ///< Axial discretization step [m]
     const double evaporator_length = 0.502;                                     ///< Evaporator length [m]
@@ -793,7 +793,7 @@ int main() {
     const double A_v_cross = M_PI * r_v * r_v;                                  ///< Vapor cross-sectional area [m^2]
 
     // Time-stepping parameters
-    double dt = 1e-6;                                   ///< Initial time step [s] (then it is updated according to the limits)
+    double dt = 1e-3;                                   ///< Initial time step [s] (then it is updated according to the limits)
     const int tot_iter = 100000;                        ///< Number of timesteps
     const double time_total = tot_iter * dt;            ///< Total simulation time [s]
 
@@ -847,7 +847,7 @@ int main() {
     std::ofstream w_temperature_output(name + "/wall_temperature.txt", std::ios::trunc);
 
     std::ofstream v_alpha_output(name + "/vapor_alpha.txt", std::ios::trunc);
-    std::ofstream l_alpha_output(name + "reults/liquid_alpha.txt", std::ios::trunc);
+    std::ofstream l_alpha_output(name + "/liquid_alpha.txt", std::ios::trunc);
 
     const int global_precision = 4;
 
@@ -925,7 +925,7 @@ int main() {
     std::vector<double> p_saturation(N, 0.0);
 
     std::vector<double> Gamma_xv(N, 0.0);
-    std::vector<double> T_sur(N, 600.0);
+    std::vector<double> T_sur(N, 800.0);
 
     std::vector<SparseBlock> L(N), D(N), R(N);
     std::vector<VecBlock> Q(N), X(N), X_old(N), X_iter(N), X_new(N);
@@ -956,7 +956,7 @@ int main() {
     for(int n = 0; n < tot_iter; ++n) {
 
 		X_old = X;        // X contains the solution at the previous timestep
-		X_iter = X_old;   // X_iter will contain the solution at the current Picard iteration
+        X_iter = X_old;
 
         for (int i = 0; i < N; ++i) {
             rho_m_old[i] = X_old[i][0];
@@ -1400,7 +1400,8 @@ int main() {
                     + p_m_old[i] * alpha_m_old[i] / dt
                     + C55 + C65
                     // + heat_source_liquid_vapor_flux[i]
-                    // + heat_source_liquid_vapor_phase[i];
+                    // + heat_source_liquid_vapor_phase[i]
+                    ;
 
                 add(L[i], 2, 0,
                     - (alpha_m[i - 1] * cp_m_l * T_m[i - 1] * v_m[i - 1] * H(v_m[i - 1])) / dz
@@ -1509,9 +1510,10 @@ int main() {
                             ) / dz
                     + eps_v * p_l_old[i] * alpha_l_old[i] / dt
                     + C50 + C60 + C70
-                    + heat_source_wall_liquid_flux[i]
-                    + heat_source_vapor_liquid_flux[i]
-                    + heat_source_vapor_liquid_phase[i];
+                    // + heat_source_wall_liquid_flux[i]
+                    // + heat_source_vapor_liquid_flux[i]
+                    // + heat_source_vapor_liquid_phase[i]
+                    ;
 
                 add(L[i], 3, 1,
                     - eps_v * (alpha_l[i - 1] * cp_l_l * T_l[i - 1] * v_l[i - 1] * H(v_l[i - 1])) / dz
@@ -1587,7 +1589,8 @@ int main() {
                     q_pp[i] * 2 * r_o / (r_o * r_o - r_i * r_i)
                     + (rho_w_p * cp_w_p * T_w_old[i]) / dt
                     + C75
-                    // + heat_source_liquid_wall_flux[i];
+                    // + heat_source_liquid_wall_flux[i]
+                    ;
 
                 add(L[i], 4, 10,
                     - k_w_lf / (dz * dz)
@@ -1886,7 +1889,9 @@ int main() {
 
         }
 
-        const int output_every = 100;
+        X = X_new;
+
+        const int output_every = 1000;
 
         if (n % output_every == 0) {
             for (int i = 0; i < N; ++i) {
@@ -1906,8 +1911,9 @@ int main() {
                 v_alpha_output << X[i][2] << " ";
                 l_alpha_output << X[i][3] << " ";
 
-                time_output << n * output_every * dt << " ";
             }
+
+            time_output << n * dt << " ";
 
             v_velocity_output << "\n";
             v_pressure_output << "\n";
