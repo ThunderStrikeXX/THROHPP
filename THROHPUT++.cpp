@@ -793,7 +793,7 @@ int main() {
     const double A_v_cross = M_PI * r_v * r_v;                                  ///< Vapor cross-sectional area [m^2]
 
     // Time-stepping parameters
-    double dt = 1e-3;                                   ///< Initial time step [s] (then it is updated according to the limits)
+    double dt = 1e-5;                                   ///< Initial time step [s] (then it is updated according to the limits)
     const int tot_iter = 100000;                        ///< Number of timesteps
     const double time_total = tot_iter * dt;            ///< Total simulation time [s]
 
@@ -822,7 +822,7 @@ int main() {
     int new_case = 0;
     std::string name = "case_0";
     while (true) {
-        std::string name = "case_" + std::to_string(new_case);
+        name = "case_" + std::to_string(new_case);
         if (!std::filesystem::exists(name)) {
             std::filesystem::create_directory(name);
             break;
