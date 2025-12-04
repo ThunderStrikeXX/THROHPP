@@ -1,13 +1,8 @@
-Below is a **clean, professional, publication-ready README** for your solver, assuming the final chosen name is **THRO-CXX**.
-It is structured exactly as expected for a research-grade numerical code repository.
-
----
-
-# THRO-CXX
+# THROHPP
 
 **A Monolithic 1-D Sodium Heat-Pipe Solver in C++**
 
-THRO-CXX is a fully coupled, monolithic, one-dimensional solver for transient sodium heat-pipe simulations.
+THROHPP is a fully coupled, monolithic, one-dimensional solver for transient sodium heat-pipe simulations.
 It is inspired by the THROHPUT architecture but rewritten completely in modern C++.
 The code resolves vapor, liquid wick, and solid wall regions simultaneously through a unified block-tridiagonal formulation and detailed phase-change closures.
 
@@ -19,7 +14,7 @@ This solver is intended for research on advanced heat-pipe modelling, thermoflui
 
 ### Multi-region physics
 
-THRO-CXX solves three strongly coupled regions:
+THROHPP solves three strongly coupled regions:
 
 * **Vapor core** (compressible, convective, Navier–Stokes with friction correlations)
 * **Porous wick (liquid)** (Darcy-Brinkman-Forchheimer, capillary pressure model)
@@ -82,7 +77,7 @@ case_0/, case_1/, case_2/, ...
 ## Code Structure
 
 ```
-THRO-CXX/
+THROHPP/
 │
 ├── main.cpp                # complete solver
 ├── material_models/        # steel, sodium liquid, sodium vapor property functions
@@ -95,7 +90,7 @@ THRO-CXX/
 
 ## Dependencies
 
-THRO-CXX uses only standard C++17 libraries:
+THROHPP uses only standard C++17 libraries:
 
 * `<vector>`
 * `<array>`
