@@ -332,8 +332,8 @@ int main() {
     double const eps_v = 1.0;               /// Surface fraction of the wick available for liquid passage [-]
 
     // Wick permeability parameters
-    const double K = 1e-8;                  /// Permeability [m^2]
-    const double CF = 1e4;                  /// Forchheimer coefficient [1/m]
+    const double K = 1e-10;                  /// Permeability [m^2]
+    const double CF = 1e5;                  /// Forchheimer coefficient [1/m]
     
     // Environmental boundary conditions
     const double h_conv = 10;               /// Convective heat transfer coefficient for external heat removal [W/m^2/K]
@@ -360,21 +360,13 @@ int main() {
     const double r_i = 0.0112;                                                  /// Wall-wick interface radius [m]
     const double r_v = 0.01075;                                                 /// Vapor-wick interface radius [m]
 
-    // Surfaces 
-    const double A_w_outer = 2 * M_PI * r_o * dz;                               /// Wall radial area (at r_o) [m^2]
-    const double A_w_cross = M_PI * (r_o * r_o - r_i * r_i);                    /// Wall cross-sectional area [m^2]
-    const double A_x_interface = 2 * M_PI * r_i * dz;                           /// Wick radial area (at r_i) [m^2]
-    const double A_x_cross = M_PI * (r_i * r_i - r_v * r_v);                    /// Wick cross-sectional area [m^2]
-    const double A_v_inner = 2 * M_PI * r_v * dz;                               /// Vapor radial area (at r_v) [m^2]
-    const double A_v_cross = M_PI * r_v * r_v;                                  /// Vapor cross-sectional area [m^2]
-
     const double Eio1 = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));
     const double Eio2 = 0.5 * (r_o * r_o + r_i * r_i);
     const double Evi1 = 2.0 / 3.0 * (r_i + r_v - 1 / (1 / r_i + 1 / r_v));
     const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Time-stepping parameters
-    double dt = 1e-3;                                   /// Initial time step [s] (then it is updated according to the limits)
+    double dt = 5e-5;                                   /// Initial time step [s] (then it is updated according to the limits)
     const int tot_iter = 100000;                        /// Number of timesteps
     const double time_total = tot_iter * dt;            /// Total simulation time [s]
 
@@ -413,14 +405,12 @@ int main() {
     // Temperature initialization
     for (int i = 0; i < N; ++i) {
 
-        const double f = double(i) / double(N - 1);
-        const double T = 800.0 + f * (600.0 - 800.0);
-        T_m[i] = T;
-        T_l[i] = T;
-        T_w[i] = T;
-        T_sur[i] = T;
+        T_m[i] = T_full;
+        T_l[i] = T_full;
+        T_w[i] = T_full;
+        T_sur[i] = T_full;
 
-        p_m[i] = vapor_sodium::P_sat(T);
+        p_m[i] = vapor_sodium::P_sat(T_full);
         p_l[i] = p_m[i];
     }
 
@@ -815,9 +805,7 @@ int main() {
                         - alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))
                         ) / dz
                     + (rho_m_old[i] * alpha_m_iter[i]) / dt
-                    + (rho_m_iter[i] * alpha_m_old[i]) / dt
-                    //+ mass_source[i]
-                    ;
+                    + (rho_m_iter[i] * alpha_m_old[i]) / dt;
 
                 add(L[i], 0, 0,
                     - (alpha_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
@@ -829,7 +817,7 @@ int main() {
 
                 add(L[i], 0, 6,
                     - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
-                    + (alpha_m_iter[i] * rho_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
+                    - (alpha_m_iter[i] * rho_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
                 );
 
                 add(R[i], 0, 0,
@@ -885,9 +873,7 @@ int main() {
                         - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1])))
                         ) / dz
                     + eps_v * (rho_l_iter[i] * alpha_l_old[i]) / dt
-                    + eps_v * (rho_l_old[i] * alpha_l_iter[i]) / dt
-                    //- mass_source[i]
-                    ;
+                    + eps_v * (rho_l_old[i] * alpha_l_iter[i]) / dt;
 
                 add(L[i], 1, 1,
                     - eps_v * (alpha_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
@@ -938,7 +924,7 @@ int main() {
                     - C51 - C61
 			    );
 
-                add(D[i], 2, 6,
+                add(D[i], 2, 6, 0.0
                     + (alpha_m_iter[i] * rho_m_iter[i] * cp_m_p * T_m_iter[i] * H(v_m_iter[i]) + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cp_m_r * T_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
                     + p_m_iter[i] * (alpha_m_iter[i] * H(v_m_iter[i]) + alpha_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
                 );
@@ -952,11 +938,11 @@ int main() {
                     - C52 - C62
                 );
 
-                add(D[i], 2, 9, 
+                add(D[i], 2, 9,
 				    - C53 - C63
                 );
 
-                add(D[i], 2, 10, 
+                add(D[i], 2, 10,
                     - C54 - C64
                 );
 
@@ -977,10 +963,7 @@ int main() {
                         - alpha_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))
                         ) / dz
                     + p_m_iter[i] * alpha_m_old[i] / dt
-                    + C55 + C65
-                    // + heat_source_liquid_vapor_flux[i]
-                    // + heat_source_liquid_vapor_phase[i]
-                    ;
+                    + C55 + C65;
 
                 add(L[i], 2, 0,
                     - (alpha_m_iter[i - 1] * cp_m_l * T_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
@@ -992,11 +975,8 @@ int main() {
                 );
 
                 add(L[i], 2, 6,
-                    - (
-                        + alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cp_m_l * T_m_iter[i - 1] * H(v_m_iter[i - 1])
-                        + alpha_m_iter[i] * rho_m_iter[i] * cp_m_l * T_m_iter[i] * (1 - H(v_m_iter[i - 1]))
-                        ) / dz
-                    - p_m[i] * (alpha_m_iter[i - 1] * H(v_m_iter[i - 1]) + alpha_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
+                    - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cp_m_l * T_m_iter[i - 1] * H(v_m_iter[i - 1]) + alpha_m_iter[i] * rho_m_iter[i] * cp_m_l * T_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
+                    - p_m_iter[i] * (alpha_m_iter[i - 1] * H(v_m_iter[i - 1]) + alpha_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
                 );
 
                 add(L[i], 2, 8,
@@ -1062,7 +1042,6 @@ int main() {
                     + eps_v * (alpha_l_iter[i] * k_l_p * H(v_l_iter[i]) + alpha_l_iter[i + 1] * k_l_r * (1 - H(v_l_iter[i]))) / (dz * dz)
                     + eps_v * (alpha_l_iter[i - 1] * k_l_l * H(v_l_iter[i - 1]) + alpha_l_iter[i] * k_l_p * (1 - H(v_l_iter[i - 1]))) / (dz * dz)
                     - C48 - C58 - C68
-
                 );
 
                 add(D[i], 3, 10, 
@@ -1077,7 +1056,7 @@ int main() {
                         + alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])
                         + alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))
                         - alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])
-                        - alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i] - 1 * (1 - H(v_l_iter[i - 1]))
+                        - alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))
                             ) / dz
                     + eps_v * p_l_iter[i] * (
                             + alpha_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])
@@ -1086,11 +1065,7 @@ int main() {
                             - alpha_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))
                             ) / dz
                     + eps_v * p_l_iter[i] * alpha_l_old[i] / dt
-                    + C50 + C60 + C70
-                    // + heat_source_wall_liquid_flux[i]
-                    // + heat_source_vapor_liquid_flux[i]
-                    // + heat_source_vapor_liquid_phase[i]
-                    ;
+                    + C50 + C60 + C70;
 
                 add(L[i], 3, 1,
                     - eps_v * (alpha_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
@@ -1165,9 +1140,7 @@ int main() {
                 Q[i][4] =
                     q_pp[i] * 2 * r_o / (r_o * r_o - r_i * r_i)
                     + (rho_w_p * cp_w_p * T_w_old[i]) / dt
-                    + C75
-                    // + heat_source_liquid_wall_flux[i]
-                    ;
+                    + C75;
 
                 add(L[i], 4, 10,
                     - k_w_lf / (dz * dz)
@@ -1203,7 +1176,7 @@ int main() {
                 add(D[i], 5, 6,
                     + (alpha_m_iter[i] * rho_m_iter[i]) / dt
                     + 2 * (rho_m_iter[i] * alpha_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
-                    + 2 * (rho_m_iter[i + 1] * alpha_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
+                    + 2 * (rho_m_iter[i + 1] * alpha_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
                     + (Fm * rho_m_iter[i] * std::abs(v_m_iter[i]) * H(v_m_iter[i])) / (4 * r_v)
                     + (Fm * rho_m_iter[i + 1] * std::abs(v_m_iter[i]) * (1 - H(v_m_iter[i]))) / (4 * r_v)
                 );
@@ -1227,7 +1200,7 @@ int main() {
 
                 add(L[i], 5, 6,
                     - 2 * (rho_m_iter[i - 1] * alpha_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
-                    - 2 * (rho_m_iter[i] * alpha_m_iter[i] * v_m[i] * (1 - H(v_m_iter[i - 1]))) / dz
+                    - 2 * (rho_m_iter[i] * alpha_m_iter[i] * v_m[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
                 );
 
                 add(R[i], 5, 0,
@@ -1267,7 +1240,7 @@ int main() {
                 add(D[i], 6, 7,
                     + eps_v * (alpha_l_iter[i] * rho_l_iter[i]) / dt
                     + 2 * eps_v * (rho_l_iter[i] * alpha_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
-                    + 2 * eps_v * (rho_l_iter[i + 1] * alpha_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i]))) / dz
+                    + 2 * eps_v * (rho_l_iter[i + 1] * alpha_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
                     + (Fl * std::abs(v_l_iter[i]) * H(v_l_iter[i]))
                     + (Fl * std::abs(v_l_iter[i]) * (1 - H(v_l_iter[i])))
                 );
@@ -1291,7 +1264,7 @@ int main() {
 
                 add(L[i], 6, 7,
                     - 2 * eps_v * (rho_l_iter[i - 1] * alpha_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
-                    - 2 * eps_v * (rho_l_iter[i] * alpha_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i - 1]))) / dz
+                    - 2 * eps_v * (rho_l_iter[i] * alpha_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
                 );
 
                 add(R[i], 6, 1,
@@ -1310,19 +1283,11 @@ int main() {
 
                 // State mixture equation
 
-                add(D[i], 7, 0, 
-                    - T_m_old[i] * Rv
-                );
+                add(D[i], 7, 0, -T_m_old[i] * Rv);
+                add(D[i], 7, 4, 1.0);
+                add(D[i], 7, 8, -rho_m_old[i] * Rv);
 
-                add(D[i], 7, 4,
-                    1.0
-                );
-
-                add(D[i], 7, 8, 
-                    - rho_m_old[i] * Rv
-                );
-
-                Q[i][7] = - rho_m_old[i] * T_m_old[i] * Rv;
+                Q[i][7] = -rho_m_old[i] * T_m_old[i] * Rv;
 
                 // State liquid equation
 
@@ -1558,7 +1523,7 @@ int main() {
             T_w_old[i] = X[i][10];
         }
 
-        const int output_every = 10;
+        const int output_every = 1;
 
         if (n % output_every == 0) {
             for (int i = 0; i < N; ++i) {
