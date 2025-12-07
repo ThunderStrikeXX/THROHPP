@@ -402,13 +402,19 @@ int main() {
 
     std::vector<double> T_sur(N);
 
+    const double T_left = 810.0;
+    const double T_right = 790.0;
+
     // Temperature initialization
     for (int i = 0; i < N; ++i) {
 
-        T_m[i] = T_full;
-        T_l[i] = T_full;
-        T_w[i] = T_full;
-        T_sur[i] = T_full;
+        const double s = static_cast<double>(i) / (N - 1);
+
+        T_m[i] = T_left + s * (T_right - T_left);
+        T_l[i] = T_left + s * (T_right - T_left);
+        T_w[i] = T_left + s * (T_right - T_left);
+
+        T_sur[i] = T_left + s * (T_right - T_left);
 
         p_m[i] = vapor_sodium::P_sat(T_full);
         p_l[i] = p_m[i];
