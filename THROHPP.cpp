@@ -309,13 +309,13 @@ inline int H(double x) {
     return x > 0.0 ? 1 : 0;
 }
 
-#pragma endregion
-
 inline double surf_ten(double T) {
     constexpr double Tm = 371.0;
     double val = 0.196 - 2.48e-4 * (T - Tm);
     return val > 0.0 ? val : 0.0;
 }
+
+#pragma endregion
 
 int main() {
 
