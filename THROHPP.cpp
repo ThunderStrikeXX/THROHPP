@@ -366,12 +366,12 @@ int main() {
     const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Time-stepping parameters
-    double dt_user = 1e-5;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-3;                              /// Initial time step [s] (then it is updated according to the limits)
     const int tot_iter = 1e10;                        /// Number of timesteps
 
     // Numerical parameters
-    const double tolerance = 1e-2;			            /// Tolerance for the convergence of Picard loop [-]
-    const int max_picard = 50;                         /// Maximum number of Picard iterations per timestep
+    const double tolerance = 1e-4;			            /// Tolerance for the convergence of Picard loop [-]
+    const int max_picard = 100;                         /// Maximum number of Picard iterations per timestep
 
     // Mesh z positions
     std::vector<double> mesh(N, 0.0);
@@ -432,6 +432,8 @@ int main() {
     std::vector<double> T_l_old = T_l;
     std::vector<double> T_w_old = T_w;
 
+	std::vector<double> T_sur_old = T_sur;
+
     std::vector<double> rho_m_iter(N);
     std::vector<double> rho_l_iter(N);
     std::vector<double> alpha_m_iter(N);
@@ -444,6 +446,10 @@ int main() {
     std::vector<double> T_l_iter(N);
     std::vector<double> T_w_iter(N);
 
+	std::vector<double> T_sur_iter(N);
+    std::vector<double> Gamma_xv_iter(N);
+    std::vector<double> phi_x_v_iter(N);
+
     // Blocks definition
     std::vector<SparseBlock> L(N), D(N), R(N);
     std::vector<VecBlock> Q(N), X(N);
@@ -453,7 +459,9 @@ int main() {
     std::vector<double> Gamma_xv_lin(N, 0.0);
     std::vector<double> Gamma_xv_diff(N, 0.0);
     std::vector<double> Gamma_xv_other(N, 0.0);
+    std::vector<double> Gamma_xv_old = Gamma_xv;
     std::vector<double> phi_x_v(N, 0.0);
+    std::vector<double> phi_x_v_old = phi_x_v;
     std::vector<double> heat_source_wall_liquid_flux(N, 0.0);
     std::vector<double> heat_source_liquid_wall_flux(N, 0.0);
     std::vector<double> heat_source_vapor_liquid_phase(N, 0.0);
@@ -589,6 +597,10 @@ int main() {
             T_l_iter = T_l;
             T_w_iter = T_w;
 
+			T_sur_iter = T_sur;
+            Gamma_xv_iter = Gamma_xv;
+            phi_x_v_iter = phi_x_v;
+
 		    // Space discretization loop
             for(int i = 1; i < N - 1; ++i) {
 
@@ -603,25 +615,25 @@ int main() {
                 const double Re_v = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_v;                     /// Reynolds number [-]
                 const double Pr_v = cp_m * mu_v / k_m;                                              /// Prandtl number [-]
                 const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);                    /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                const double Psat = vapor_sodium::P_sat(T_sur[i]);                                  /// Saturation pressure [Pa]         
-                const double dPsat_dT = Psat * std::log(10.0) * (7740.0 / (T_sur[i] * T_sur[i]));   /// Derivative of the saturation pressure wrt T [Pa/K]   
+                const double Psat = vapor_sodium::P_sat(T_sur_iter[i]);                                  /// Saturation pressure [Pa]         
+                const double dPsat_dT = Psat * std::log(10.0) * (7740.0 / (T_sur_iter[i] * T_sur_iter[i]));   /// Derivative of the saturation pressure wrt T [Pa/K]   
         
                 double h_xv_v;      /// Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
                 double h_vx_x;      /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
-                if (Gamma_xv[i] >= 0.0) {
+                if (Gamma_xv_iter[i] >= 0.0) {
 
                     // Evaporation case
-                    h_xv_v = vapor_sodium::h(T_sur[i]);
-                    h_vx_x = liquid_sodium::h(T_sur[i]);
+                    h_xv_v = vapor_sodium::h(T_sur_iter[i]);
+                    h_vx_x = liquid_sodium::h(T_sur_iter[i]);
 
                 }
                 else {
 
                     // Condensation case
                     h_xv_v = vapor_sodium::h(T_m_iter[i]);
-                    h_vx_x = liquid_sodium::h(T_sur[i])
-                        + (vapor_sodium::h(T_m_iter[i]) - vapor_sodium::h(T_sur[i]));
+                    h_vx_x = liquid_sodium::h(T_sur_iter[i])
+                        + (vapor_sodium::h(T_m_iter[i]) - vapor_sodium::h(T_sur_iter[i]));
                 }
 
                 // Update heat fluxes at the interfaces
@@ -634,8 +646,8 @@ int main() {
                     q_pp[i] = -(conv + irr);                                                           /// Heat flux at the outer wall (positive if to the wall)
                 }
 
-                const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur[i]);
-                const double b = -phi_x_v[i] / (p_m_iter[i] * std::sqrt(2.0 / (Rv * T_m_iter[i])));
+                const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur_iter[i]);
+                const double b = -phi_x_v_iter[i] / (p_m_iter[i] * std::sqrt(2.0 / (Rv * T_m_iter[i])));
 
                 if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
                 else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
@@ -643,9 +655,9 @@ int main() {
 
                 const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);        /// Useful factor in the coefficients calculation [s / m^2]
 
-                const double bGamma = -(Gamma_xv[i] / (2.0 * T_sur[i])) + fac * sigma_e * dPsat_dT; /// b coefficient [kg/(m3 s K)] 
-                const double aGamma = 0.5 * Gamma_xv[i] + fac * sigma_e * dPsat_dT * T_sur[i];      /// a coefficient [kg/(m3 s)]
-                const double cGamma = -fac * sigma_c * Omega;                                       /// c coefficient [s/m2]
+                double bGamma = -(Gamma_xv_iter[i] / (2.0 * T_sur_iter[i])) + fac * sigma_e * dPsat_dT;
+                double cGamma = -fac * sigma_c * Omega;
+                double aGamma = Gamma_xv_iter[i] - bGamma * T_sur_iter[i];
 
                 const double Ex3 = H_xm + (h_vx_x * r_i * r_i) / (2.0 * r_v) * bGamma;
                 const double Ex4 = -k_x + H_xm * r_v + h_vx_x * r_i * r_i / 2.0 * bGamma;
@@ -1465,15 +1477,15 @@ int main() {
 
                 DenseBlock D_dense = to_dense(D[i]);
 
+                T_sur_iter[i] = C36 * p_m_iter[i] + C37 * T_m_iter[i] + C38 * T_l_iter[i] + C39 * T_w_iter[i] + C40;
                 phi_x_v[i] = beta * (sigma_e * Psat - sigma_c * Omega * p_m_iter[i]);
-
                 Gamma_xv[i] = 2 * r_v * eps_s / (r_i * r_i) * phi_x_v[i];
 
+                // The two following variable are identical
                 Gamma_xv_lin[i] = C41 * p_m_iter[i] + C42 * T_m_iter[i] + C43 * T_l_iter[i] + C44 * T_w_iter[i] + C45;
+                Gamma_xv_other[i] = aGamma + bGamma * T_sur_iter[i] + cGamma * (p_m[i] - p_m_iter[i]);
 
-                Gamma_xv_other[i] = aGamma + bGamma * T_sur[i];
-
-                Gamma_xv_diff[i] = Gamma_xv_lin[i] - Gamma_xv_other[i];
+                Gamma_xv_diff[i] = Gamma_xv[i] - Gamma_xv_lin[i];
 
                 heat_source_wall_liquid_flux[i] = C66 * p_m_iter[i] + C67 * T_m_iter[i] + C68 * T_l_iter[i] + C69 * T_w_iter[i] + C70;
                 heat_source_liquid_wall_flux[i] = C71 * p_m_iter[i] + C72 * T_m_iter[i] + C73 * T_l_iter[i] + C74 * T_w_iter[i] + C75;
@@ -1485,7 +1497,6 @@ int main() {
                 heat_source_liquid_vapor_flux[i] = C51 * p_m_iter[i] + C52 * T_m_iter[i] + C53 * T_l_iter[i] + C54 * T_w_iter[i] + C55;
 
                 p_saturation[i] = Psat;
-				T_sur[i] = C36 * p_m_iter[i] + C37 * T_m_iter[i] + C38 * T_l_iter[i] + C39 * T_w_iter[i] + C40;
             }
 
             // First node boundary conditions
@@ -1679,6 +1690,9 @@ int main() {
                 T_w_old[i] = X[i][10];
             }
 
+			T_sur_old = T_sur_iter;
+            Gamma_xv_old = Gamma_xv_iter;
+
 			time_total += dt;
 
         } else {
@@ -1697,6 +1711,9 @@ int main() {
                 T_l[i] = T_l_old[i];
                 T_w[i] = T_w_old[i];
             }
+
+			T_sur = T_sur_old;
+            Gamma_xv = Gamma_xv_old;
 
 			halves += 1;
         }
