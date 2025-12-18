@@ -372,7 +372,7 @@ int main() {
     const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Time-stepping parameters
-    double dt_user = 5e-5;                            /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-5;                            /// Initial time step [s] (then it is updated according to the limits)
     const int tot_iter = 1e10;                        /// Number of timesteps
 
     // Numerical parameters
@@ -640,7 +640,7 @@ int main() {
                 const double Re_v = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_v;                     /// Reynolds number [-]
                 const double Pr_v = cp_m * mu_v / k_m;                                              /// Prandtl number [-]
                 const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);                    /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                const double Psat = vapor_sodium::P_sat(T_sur_iter[i]);                                  /// Saturation pressure [Pa]         
+                p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                                  /// Saturation pressure [Pa]         
                 const double dPsat_dT = vapor_sodium::dP_sat_dT(T_sur_iter[i]);   /// Derivative of the saturation pressure wrt T [Pa/K]   
 
                 double h_xv_v;      /// Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
@@ -1114,13 +1114,17 @@ int main() {
 
                 Q[i][2] = 0.0
 
-                    // Temporal term
-                    + (alpha_m_iter[i] * cp_m_p * T_m_iter[i] * rho_m_old[i]) / dt
-                    + (alpha_m_iter[i] * cp_m_p * T_m_old[i] * rho_m_iter[i]) / dt
-                    + (alpha_m_old[i] * cp_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
+                    // Temporal term (cross terms version)
+                    // + (alpha_m_iter[i] * cp_m_p * T_m_iter[i] * rho_m_old[i]) / dt
+                    // + (alpha_m_iter[i] * cp_m_p * T_m_old[i] * rho_m_iter[i]) / dt
+                    // + (alpha_m_old[i] * cp_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
+
+                    // Temporal term (conservation version)
+                    + 2 * (alpha_m_iter[i] * cp_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
+                    + (alpha_m_old[i] * cp_m_p * T_m_old[i] * rho_m_old[i]) / dt
 
                     // Convective term
-                    + 3 * ( 
+                    + 3 * (
                         + alpha_m_iter[i] * rho_m_iter[i] * cp_m_p * T_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])
                         + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cp_m_r * T_m_iter[i + 1] * v_m_iter[i ] * (1 - H(v_m_iter[i]))
                         - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cp_m_l * T_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])
@@ -1699,10 +1703,6 @@ int main() {
 
                 Gamma_xv[i] = 2 * r_v * eps_s / (r_i * r_i) * phi_x_v[i];
 
-                Gamma_xv_diff[i] = Gamma_xv_approx[i] - Gamma_xv[i];
-
-                p_saturation[i] = Psat;
-
                 energy_wall[i] = rho_w_p * cp_w_p * T_w_iter[i] * V_wall;
                 energy_liquid[i] = alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * V_liquid;
                 energy_vapor[i] = alpha_m_iter[i] * rho_m_iter[i] * cp_m_p * T_m_iter[i] * V_vapor;
@@ -1874,8 +1874,9 @@ int main() {
                 T_l[i] = X[i][9];
                 T_w[i] = X[i][10];     
 
-                // Check linearization error of mass source here :)
-                // Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
+                // Check linearization error of mass source
+                Gamma_xv_diff[i] = Gamma_xv_approx[i] - Gamma_xv[i];
+                Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
             }
 
             if (L1 < tolerance) {
