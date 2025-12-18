@@ -372,7 +372,7 @@ int main() {
     const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Time-stepping parameters
-    double dt_user = 1e-5;                            /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 5e-5;                            /// Initial time step [s] (then it is updated according to the limits)
     const int tot_iter = 1e10;                        /// Number of timesteps
 
     // Numerical parameters
@@ -1236,7 +1236,7 @@ int main() {
                     + p_l_iter[i] / dt
                 );
 
-                add(D[i], 3, 5, 0.0
+                add(D[i], 3, 4, 0.0
 
                     // Source term
                     - C46 - C56 - C66
