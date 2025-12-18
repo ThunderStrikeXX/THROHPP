@@ -477,6 +477,7 @@ int main() {
     std::vector<double> Gamma_xv(N, 0.0);
     std::vector<double> Gamma_xv_lin(N, 0.0);
     std::vector<double> Gamma_xv_diff(N, 0.0);
+    std::vector<double> Gamma_xv_diff2(N, 0.0);
     std::vector<double> Gamma_xv_approx(N, 0.0);
     std::vector<double> phi_x_v(N, 0.0);
     std::vector<double> heat_source_wall_liquid_flux(N, 0.0);
@@ -1703,6 +1704,8 @@ int main() {
 
                 Gamma_xv[i] = 2 * r_v * eps_s / (r_i * r_i) * phi_x_v[i];
 
+                Gamma_xv_lin[i] = C41 * p_m_iter[i] + C42 * T_m_iter[i] + C43 * T_l_iter[i] + C44 * T_w_iter[i] + C45;
+
                 energy_wall[i] = rho_w_p * cp_w_p * T_w_iter[i] * V_wall;
                 energy_liquid[i] = alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * V_liquid;
                 energy_vapor[i] = alpha_m_iter[i] * rho_m_iter[i] * cp_m_p * T_m_iter[i] * V_vapor;
@@ -1876,6 +1879,7 @@ int main() {
 
                 // Check linearization error of mass source
                 Gamma_xv_diff[i] = Gamma_xv_approx[i] - Gamma_xv[i];
+                Gamma_xv_diff2[i] = Gamma_xv_approx[i] - Gamma_xv[i];
                 Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
             }
 
