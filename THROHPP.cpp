@@ -316,6 +316,12 @@ inline int H(double x) {
 
 int main() {
 
+    // =======================================================================
+    //
+    //                        [CONSTANTS AND VARIABLES]
+    //
+    // =======================================================================
+
     #pragma region constants_and_variables
 
     // Mathematical constants
@@ -375,6 +381,7 @@ int main() {
     int halves = 0;                                     /// Number of times the time step has been halved [-]
 
     // Picard loops parameters	          
+    int pic = 0;                                        /// Number of Picard iterations [-]
     const int max_picard = 100;                         /// Maximum number of Picard iterations per timestep [-]
     std::array<double, B> L_pic;                        /// Picard residuals [-]
     std::array<bool, B> conv_var;                       /// Bool array if parameter converged or not [-]
@@ -434,6 +441,9 @@ int main() {
     std::vector<double> energy_wall(N, 0.0);                        /// Wall internal energy [J]
     std::vector<double> energy_liquid(N, 0.0);                      /// Liquid internal energy [J]
     std::vector<double> energy_vapor(N, 0.0);                       /// Mixture internal energy [J]
+    std::vector<double> aGamma(N);                                  /// a coefficient for the mass volumetric source approximation [?]
+    std::vector<double> bGamma(N);                                  /// b coefficient for the mass volumetric source approximation [?]
+    std::vector<double> cGamma(N);                                  /// c coefficient for the mass volumetric source approximation [?]
 
     double h_xv_v;                                                  /// Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
@@ -601,21 +611,21 @@ int main() {
 	// Time-stepping loop
     for(int n = 0; n < tot_iter; ++n) {
 
-        dt = dt_user;
-
-        dt = std::max(dt_user * pow(0.5, halves), 1e-7);
-
-        int pic = 0;
+        // Timestep selection
+        dt = dt_user;                                       // Default --> user chosen timestep
+        dt = std::max(dt_user * pow(0.5, halves), 1e-7);    // Halfing of the timestep up to a lower bound     
 
 		// Picard iteration loop
         for (pic = 0; pic < max_picard; ++pic) {
 
+            // Cleaning all the blocks (the add function adds block and does not overwrite, so this is necessary)
             for (int i = 0; i < N; i++) {
                 L[i].row.clear(); L[i].col.clear(); L[i].val.clear();
                 D[i].row.clear(); D[i].col.clear(); D[i].val.clear();
                 R[i].row.clear(); R[i].col.clear(); R[i].val.clear();
             }
 
+            /// Picard --> iter = new
             rho_m_iter = rho_m;
             rho_l_iter = rho_l;
             alpha_m_iter = alpha_m;
@@ -632,27 +642,171 @@ int main() {
             phi_x_v_iter = phi_x_v;
             Gamma_xv_iter = Gamma_xv;
 
-            std::vector<double> aGamma(N);
-            std::vector<double> bGamma(N);
-            std::vector<double> cGamma(N);
-
 		    // Space discretization loop
             for(int i = 1; i < N - 1; ++i) {
 
-                // Physical properties
-                const double k_w = steel::k(T_w_iter[i]);                                                /// Wall thermal conductivity [W/(m K)]
-                const double k_x = liquid_sodium::k(T_l_iter[i]);                                        /// Liquid thermal conductivity [W/(m K)]
-                const double k_m = vapor_sodium::k(T_m_iter[i], p_m_iter[i]);                                 /// Vapor thermal conductivity [W/(m K)]
-                const double cp_m = vapor_sodium::cp(T_m_iter[i]);                                       /// Vapor specific heat [J/(kg K)]
-                const double mu_v = vapor_sodium::mu(T_m_iter[i]);                                       /// Vapor dynamic viscosity [Pa*s]
-                const double mu_l = liquid_sodium::mu(T_l_iter[i]);                                      /// Liquid dynamic viscosity
-                const double Dh_v = 2.0 * r_v;                                                      /// Hydraulic diameter of the vapor core [m]
-                const double Re_v = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_v;                     /// Reynolds number [-]
-                const double Pr_v = cp_m * mu_v / k_m;                                              /// Prandtl number [-]
-                const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);                    /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                                  /// Saturation pressure [Pa]         
-                const double dPsat_dT = vapor_sodium::dP_sat_dT(T_sur_iter[i]);   /// Derivative of the saturation pressure wrt T [Pa/K]   
+                // =======================================================================
+                //
+                //                              [COEFFICIENTS]
+                //
+                // =======================================================================
 
+                #pragma region coefficients
+
+                // Physical properties
+                const double k_w = steel::k(T_w_iter[i]);                                   /// Wall thermal conductivity [W/(m K)]
+                const double k_x = liquid_sodium::k(T_l_iter[i]);                           /// Liquid thermal conductivity [W/(m K)]
+                const double k_m = vapor_sodium::k(T_m_iter[i], p_m_iter[i]);               /// Vapor thermal conductivity [W/(m K)]
+                const double cp_m = vapor_sodium::cp(T_m_iter[i]);                          /// Vapor specific heat [J/(kg K)]
+                const double mu_v = vapor_sodium::mu(T_m_iter[i]);                          /// Vapor dynamic viscosity [Pa*s]
+                const double mu_l = liquid_sodium::mu(T_l_iter[i]);                         /// Liquid dynamic viscosity
+                const double Dh_v = 2.0 * r_v;                                              /// Hydraulic diameter of the vapor core [m]
+                const double Re_v = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_v;   /// Reynolds number [-]
+                const double Pr_v = cp_m * mu_v / k_m;                                      /// Prandtl number [-]
+                const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);            /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                       /// Saturation pressure [Pa]         
+                const double dPsat_dT = vapor_sodium::dP_sat_dT(T_sur_iter[i]);             /// Derivative of the saturation pressure wrt T [Pa/K]   
+
+
+                // Omega factor definition (at the moment, not active)
+                double Omega = 1.0;
+
+                // const double b = -phi_x_v_iter[i] / (p_m_iter[i] * std::sqrt(2.0 / (Rv * T_m_iter[i])));
+                // if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
+                // else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
+                // else Omega = 2.0 * b * std::sqrt(M_PI);
+
+                // Gamma coefficients definition (everything is calculated using iter (k-iteration) values)
+                const double Kgeom = 2.0 * r_v * eps_s / (r_i * r_i);
+                const double beta = 1.0 / std::sqrt(2.0 * M_PI * Rv * T_sur_iter[i]);
+                const double betap = -0.5 * beta / T_sur_iter[i];
+
+                const double Psat = vapor_sodium::P_sat(T_sur_iter[i]);
+                const double dPsat = vapor_sodium::dP_sat_dT(T_sur_iter[i]);
+
+                const double Gk = Kgeom * beta * (sigma_e * Psat - sigma_c * p_m_iter[i]); // EXACT Gamma at k
+
+                cGamma[i] = Kgeom * beta * (-sigma_c);
+                bGamma[i] = Kgeom * (betap * (sigma_e * Psat - sigma_c * p_m_iter[i]) + beta * (sigma_e * dPsat));
+                aGamma[i] = Gk - bGamma[i] * T_sur_iter[i];
+
+                // Radial model constants
+                const double Ex3 = H_xm + (h_vx_x * r_i * r_i) / (2.0 * r_v) * bGamma[i];
+                const double Ex4 = -k_x + H_xm * r_v + h_vx_x * r_i * r_i / 2.0 * bGamma[i];
+                const double Ex5 = -2.0 * r_v * k_x + H_xm * r_v * r_v + h_vx_x * r_i * r_i / 2.0 * bGamma[i] * r_v;
+                const double Ex6 = -H_xm;
+                const double Ex7 = (h_vx_x * r_i * r_i) / (2.0 * r_v) * cGamma[i];
+                const double Ex8 = (h_vx_x * r_i * r_i) / (2.0 * r_v) * aGamma[i];
+
+                const double alpha = 1.0 / (2 * r_o * (Eio1 - r_i) + r_i * r_i - Eio2);
+                const double gamma = r_i * r_i + ((Ex5 - Evi2 * Ex3) * (Evi1 - r_i)) / (Ex4 - Evi1 * Ex3) - Evi2;
+
+                // Delta coefficients
+                const double C1 = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex7;
+                const double C2 = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex6;
+                const double C3 = +(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex3 + 1;
+                const double C4 = -1;
+                const double C5 = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * (Ex8 - Ex7 * p_m_iter[i]) + q_pp[i] / k_w * (Eio1 - r_i);
+
+                // c_x coefficients
+                const double C6 = (2 * k_w * (r_o - r_i) * alpha * C1 + k_x * Ex7 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                const double C7 = (2 * k_w * (r_o - r_i) * alpha * C2 + k_x * Ex6 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                const double C8 = (2 * k_w * (r_o - r_i) * alpha * C3 - k_x * Ex3 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                const double C9 = (2 * k_w * (r_o - r_i) * alpha * C4) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                const double C10 = (-q_pp[i] + 2 * k_w * (r_o - r_i) * alpha * C5 + k_x * (Ex8 - p_m_iter[i] * Ex7) / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+
+                // c_w coefficients
+                const double C11 = alpha * (C1 + gamma * C6);
+                const double C12 = alpha * (C2 + gamma * C7);
+                const double C13 = alpha * (C3 + gamma * C8);
+                const double C14 = alpha * (C4 + gamma * C9);
+                const double C15 = alpha * (C5 + gamma * C10);
+
+                // b_w coefficients
+                const double C16 = -2 * r_o * C11;
+                const double C17 = -2 * r_o * C12;
+                const double C18 = -2 * r_o * C13;
+                const double C19 = -2 * r_o * C14;
+                const double C20 = -2 * r_o * C15 + q_pp[i] / k_w;
+
+                // a_w coefficients
+                const double C21 = (2 * r_o * Eio1 - Eio2) * C11;
+                const double C22 = (2 * r_o * Eio1 - Eio2) * C12;
+                const double C23 = (2 * r_o * Eio1 - Eio2) * C13;
+                const double C24 = (2 * r_o * Eio1 - Eio2) * C14 + 1;
+                const double C25 = (2 * r_o * Eio1 - Eio2) * C15 - q_pp[i] * Eio1 / k_w;
+
+                // b_x coefficients
+                const double C26 = (-(Ex5 - Evi2 * Ex3) * C6 + Ex7) / (Ex4 - Evi1 * Ex3);
+                const double C27 = (-(Ex5 - Evi2 * Ex3) * C7 + Ex6) / (Ex4 - Evi1 * Ex3);
+                const double C28 = (-(Ex5 - Evi2 * Ex3) * C8 - Ex3) / (Ex4 - Evi1 * Ex3);
+                const double C29 = (-(Ex5 - Evi2 * Ex3) * C9) / (Ex4 - Evi1 * Ex3);
+                const double C30 = (-(Ex5 - Evi2 * Ex3) * C10 + Ex8 - p_m_iter[i] * Ex7) / (Ex4 - Evi1 * Ex3);
+
+                // a_x coefficients
+                const double C31 = -Evi1 * C26 - Evi2 * C6;
+                const double C32 = -Evi1 * C27 - Evi2 * C7;
+                const double C33 = -Evi1 * C28 - Evi2 * C8 + 1;
+                const double C34 = -Evi1 * C29 - Evi2 * C9;
+                const double C35 = -Evi1 * C30 - Evi2 * C10;
+
+                // T_sur coefficients
+                const double C36 = C31 + r_v * C26 + r_v * r_v * C6;
+                const double C37 = C32 + r_v * C27 + r_v * r_v * C7;
+                const double C38 = C33 + r_v * C28 + r_v * r_v * C8;
+                const double C39 = C34 + r_v * C29 + r_v * r_v * C9;
+                const double C40 = C35 + r_v * C30 + r_v * r_v * C10;
+
+                // Mass source coefficients
+                const double C41 = bGamma[i] * C36 + cGamma[i];
+                const double C42 = bGamma[i] * C37;
+                const double C43 = bGamma[i] * C38;
+                const double C44 = bGamma[i] * C39;
+                const double C45 = bGamma[i] * C40 - cGamma[i] * p_m_iter[i] + aGamma[i];
+
+                // Heat source from mixture to liquid due to heat flux coefficients
+                const double C46 = -2 * k_x * r_v / (r_i * r_i) * (C26 + 2 * r_v * C6);
+                const double C47 = -2 * k_x * r_v / (r_i * r_i) * (C27 + 2 * r_v * C7);
+                const double C48 = -2 * k_x * r_v / (r_i * r_i) * (C28 + 2 * r_v * C8);
+                const double C49 = -2 * k_x * r_v / (r_i * r_i) * (C29 + 2 * r_v * C9);
+                const double C50 = -2 * k_x * r_v / (r_i * r_i) * (C30 + 2 * r_v * C10);
+
+                // Heat source from liquid to mixture due to heat flux coefficients
+                const double C51 = 2 * H_xm * r_v / (r_i * r_i) * (C31 + C26 * r_v + C6 * r_v * r_v);
+                const double C52 = 2 * H_xm * r_v / (r_i * r_i) * (C32 + C27 * r_v + C7 * r_v * r_v - 1);
+                const double C53 = 2 * H_xm * r_v / (r_i * r_i) * (C33 + C28 * r_v + C8 * r_v * r_v);
+                const double C54 = 2 * H_xm * r_v / (r_i * r_i) * (C34 + C29 * r_v + C9 * r_v * r_v);
+                const double C55 = 2 * H_xm * r_v / (r_i * r_i) * (C35 + C30 * r_v + C10 * r_v * r_v);
+
+                // Heat source from mixture to liquid due to phase change coefficients
+                const double C56 = -h_vx_x * C41;
+                const double C57 = -h_vx_x * C42;
+                const double C58 = -h_vx_x * C43;
+                const double C59 = -h_vx_x * C44;
+                const double C60 = -h_vx_x * C45;
+
+                // Heat source from liquid to mixture due to phase change coefficients
+                const double C61 = h_xv_v * C41;
+                const double C62 = h_xv_v * C42;
+                const double C63 = h_xv_v * C43;
+                const double C64 = h_xv_v * C44;
+                const double C65 = h_xv_v * C45;
+
+                // Heat source from wall to liquid due to heat flux coefficients
+                const double C66 = 2 * k_w / r_i * (C16 + 2 * r_i * C11);
+                const double C67 = 2 * k_w / r_i * (C17 + 2 * r_i * C12);
+                const double C68 = 2 * k_w / r_i * (C18 + 2 * r_i * C13);
+                const double C69 = 2 * k_w / r_i * (C19 + 2 * r_i * C14);
+                const double C70 = 2 * k_w / r_i * (C20 + 2 * r_i * C15);
+
+                // Heat source from liquid to wall due to heat flux coefficients
+                const double C71 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C16 + 2 * r_i * C11);
+                const double C72 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C17 + 2 * r_i * C12);
+                const double C73 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C18 + 2 * r_i * C13);
+                const double C74 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C19 + 2 * r_i * C14);
+                const double C75 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C20 + 2 * r_i * C15);
+
+                // Definition of the enthalpies (as in THROHPUT)
                 if (Gamma_xv_iter[i] >= 0.0) {
 
                     // Evaporation case
@@ -669,171 +823,23 @@ int main() {
                 }
 
                 // Update heat fluxes at the interfaces
-                if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;                                  /// Evaporator imposed heat flux
+                if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;                   /// Evaporator imposed heat flux [W/m2]
                 else if (i >= (N - condenser_nodes)) {
 
-                    double conv = h_conv * (T_w_iter[i] - T_env);                                          /// Condenser convective heat flux
-                    double irr = emissivity * sigma * (std::pow(T_w_iter[i], 4) - std::pow(T_env, 4));     /// Condenser irradiation heat flux
+                    double conv = h_conv *
+                        (T_w_iter[i] - T_env);                              /// Condenser convective heat flux [W/m2]
+                    double irr = emissivity * sigma *
+                        (std::pow(T_w_iter[i], 4) - std::pow(T_env, 4));    /// Condenser irradiation heat flux [W/m2]
 
-                    q_pp[i] = -(conv + irr);                                                           /// Heat flux at the outer wall (positive if to the wall)
+                    q_pp[i] = -(conv + irr);                                            /// Heat flux at the outer wall [W/m2] (positive if to the wall) 
                 }
 
-                // Coefficients for the expansion around the old timestep
-                // const double beta = 1.0 / std::sqrt(2 * M_PI * Rv * T_sur_iter[i]);
-                const double b = -phi_x_v_iter[i] / (p_m_iter[i] * std::sqrt(2.0 / (Rv * T_m_iter[i])));
-
-                // if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
-                // else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
-                // else Omega = 2.0 * b * std::sqrt(M_PI);
-
-                double Omega = 1.0;
-
-                // const double fac = (2.0 * r_v * eps_s * beta) / (r_i * r_i);        /// Useful factor in the coefficients calculation [s / m^2]
-
-                // bGamma[i] = -(Gamma_xv_iter[i] / (2.0 * T_sur_iter[i])) + fac * sigma_e * dPsat_dT; /// b coefficient [kg/(m3 s K)] 
-                // aGamma[i] = 1.5 * Gamma_xv_iter[i] + fac * sigma_e * dPsat_dT * T_sur_iter[i];      /// a coefficient [kg/(m3 s)]
-                // cGamma[i] = -fac * sigma_c * Omega;                                       /// c coefficient [s/m2]
-
-                const double Kgeom = 2.0 * r_v * eps_s / (r_i * r_i);
-                const double beta = 1.0 / std::sqrt(2.0 * M_PI * Rv * T_sur_iter[i]);
-                const double betap = -0.5 * beta / T_sur_iter[i];
-
-                const double Psat = vapor_sodium::P_sat(T_sur_iter[i]);
-                const double dPsat = vapor_sodium::dP_sat_dT(T_sur_iter[i]);
-
-                const double Gk = Kgeom * beta * (sigma_e * Psat - sigma_c * p_m_iter[i]); // EXACT Gamma at k
-
-                cGamma[i] = Kgeom * beta * (-sigma_c);  // dGamma/dp_m
-
-                bGamma[i] = Kgeom * (betap * (sigma_e * Psat - sigma_c * p_m_iter[i])
-                    + beta * (sigma_e * dPsat)); // dGamma/dT_sur
-
-                aGamma[i] = Gk - bGamma[i] * T_sur_iter[i];
-
-
-                const double Ex3 = H_xm + (h_vx_x * r_i * r_i) / (2.0 * r_v) * bGamma[i];
-                const double Ex4 = -k_x + H_xm * r_v + h_vx_x * r_i * r_i / 2.0 * bGamma[i];
-                const double Ex5 = -2.0 * r_v * k_x + H_xm * r_v * r_v + h_vx_x * r_i * r_i / 2.0 * bGamma[i] * r_v;
-                const double Ex6 = -H_xm;
-                const double Ex7 = (h_vx_x * r_i * r_i) / (2.0 * r_v) * cGamma[i];
-                const double Ex8 = (h_vx_x * r_i * r_i) / (2.0 * r_v) * aGamma[i];
-
-                const double alpha = 1.0 / (2 * r_o * (Eio1 - r_i) + r_i * r_i - Eio2);
-                const double gamma = r_i * r_i + ((Ex5 - Evi2 * Ex3) * (Evi1 - r_i)) / (Ex4 - Evi1 * Ex3) - Evi2;
-
-                // Delta coefficients
-                const double C1 = - (Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex7;
-                const double C2 = - (Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex6;
-			    const double C3 = + (Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex3 + 1;
-			    const double C4 = - 1;
-			    const double C5 = - (Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * (Ex8 - Ex7 * p_m_iter[i]) + q_pp[i] / k_w * (Eio1 - r_i);
-
-			    // c_x coefficients
-			    const double C6 = (2 * k_w * (r_o - r_i) * alpha * C1 + k_x * Ex7 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-			    const double C7 = (2 * k_w * (r_o - r_i) * alpha * C2 + k_x * Ex6 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-			    const double C8 = (2 * k_w * (r_o - r_i) * alpha * C3 - k_x * Ex3 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-			    const double C9 = (2 * k_w * (r_o - r_i) * alpha * C4) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-			    const double C10 = (- q_pp[i] + 2 * k_w * (r_o - r_i) * alpha * C5 + k_x * (Ex8 - p_m_iter[i] * Ex7) / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-
-                // c_w coefficients
-			    const double C11 = alpha * (C1 + gamma * C6);
-			    const double C12 = alpha * (C2 + gamma * C7);
-			    const double C13 = alpha * (C3 + gamma * C8);
-			    const double C14 = alpha * (C4 + gamma * C9);
-			    const double C15 = alpha * (C5 + gamma * C10);
-
-			    // b_w coefficients
-			    const double C16 = - 2 * r_o * C11;
-			    const double C17 = - 2 * r_o * C12;
-			    const double C18 = - 2 * r_o * C13;
-			    const double C19 = - 2 * r_o * C14;
-			    const double C20 = - 2 * r_o * C15 + q_pp[i] / k_w;
-
-			    // a_w coefficients
-			    const double C21 = (2 * r_o * Eio1 - Eio2) * C11;
-			    const double C22 = (2 * r_o * Eio1 - Eio2) * C12;
-			    const double C23 = (2 * r_o * Eio1 - Eio2) * C13;
-			    const double C24 = (2 * r_o * Eio1 - Eio2) * C14 + 1;
-                const double C25 = (2 * r_o * Eio1 - Eio2) * C15 - q_pp[i] * Eio1 / k_w;
-
-			    // b_x coefficients
-			    const double C26 = (- (Ex5 - Evi2 * Ex3) * C6 + Ex7) / (Ex4 - Evi1 * Ex3);
-			    const double C27 = (- (Ex5 - Evi2 * Ex3) * C7 + Ex6) / (Ex4 - Evi1 * Ex3);
-			    const double C28 = (- (Ex5 - Evi2 * Ex3) * C8 - Ex3) / (Ex4 - Evi1 * Ex3);
-			    const double C29 = (- (Ex5 - Evi2 * Ex3) * C9) / (Ex4 - Evi1 * Ex3);
-			    const double C30 = (- (Ex5 - Evi2 * Ex3) * C10 + Ex8 - p_m_iter[i] * Ex7) / (Ex4 - Evi1 * Ex3);
-
-			    // a_x coefficients
-			    const double C31 = - Evi1 * C26 - Evi2 * C6;
-			    const double C32 = - Evi1 * C27 - Evi2 * C7;
-			    const double C33 = - Evi1 * C28 - Evi2 * C8 + 1;
-			    const double C34 = - Evi1 * C29 - Evi2 * C9;
-			    const double C35 = - Evi1 * C30 - Evi2 * C10;
-
-                // T_sur coefficients
-			    const double C36 = C31 + r_v * C26 + r_v * r_v * C6;
-			    const double C37 = C32 + r_v * C27 + r_v * r_v * C7;
-			    const double C38 = C33 + r_v * C28 + r_v * r_v * C8;
-			    const double C39 = C34 + r_v * C29 + r_v * r_v * C9;
-			    const double C40 = C35 + r_v * C30 + r_v * r_v * C10;
-
-                // Mass source coefficients
-			    const double C41 = bGamma[i] * C36 + cGamma[i];
-			    const double C42 = bGamma[i] * C37;
-			    const double C43 = bGamma[i] * C38;
-			    const double C44 = bGamma[i] * C39;
-			    const double C45 = bGamma[i] * C40 - cGamma[i] * p_m_iter[i] + aGamma[i];
-
-                // Heat source from mixture to liquid due to heat flux coefficients
-			    const double C46 = - 2 * k_x * r_v / (r_i * r_i) * (C26 + 2 * r_v * C6);
-			    const double C47 = - 2 * k_x * r_v / (r_i * r_i) * (C27 + 2 * r_v * C7);
-			    const double C48 = - 2 * k_x * r_v / (r_i * r_i) * (C28 + 2 * r_v * C8);
-			    const double C49 = - 2 * k_x * r_v / (r_i * r_i) * (C29 + 2 * r_v * C9);
-			    const double C50 = - 2 * k_x * r_v / (r_i * r_i) * (C30 + 2 * r_v * C10);
-
-			    // Heat source from liquid to mixture due to heat flux coefficients
-			    const double C51 = 2 * H_xm * r_v / (r_i * r_i) * (C31 + C26 * r_v + C6 * r_v * r_v);
-			    const double C52 = 2 * H_xm * r_v / (r_i * r_i) * (C32 + C27 * r_v + C7 * r_v * r_v - 1);
-			    const double C53 = 2 * H_xm * r_v / (r_i * r_i) * (C33 + C28 * r_v + C8 * r_v * r_v);
-			    const double C54 = 2 * H_xm * r_v / (r_i * r_i) * (C34 + C29 * r_v + C9 * r_v * r_v);
-			    const double C55 = 2 * H_xm * r_v / (r_i * r_i) * (C35 + C30 * r_v + C10 * r_v * r_v);
-
-			    // Heat source from mixture to liquid due to phase change coefficients
-			    const double C56 = - h_vx_x * C41;
-			    const double C57 = - h_vx_x * C42;
-			    const double C58 = - h_vx_x * C43;
-			    const double C59 = - h_vx_x * C44;
-			    const double C60 = - h_vx_x * C45;
-
-			    // Heat source from liquid to mixture due to phase change coefficients
-			    const double C61 = h_xv_v * C41;
-			    const double C62 = h_xv_v * C42;
-			    const double C63 = h_xv_v * C43;
-			    const double C64 = h_xv_v * C44;
-			    const double C65 = h_xv_v * C45;
-
-			    // Heat source from wall to liquid due to heat flux coefficients
-			    const double C66 = 2 * k_w / r_i * (C16 + 2 * r_i * C11);
-			    const double C67 = 2 * k_w / r_i * (C17 + 2 * r_i * C12);
-			    const double C68 = 2 * k_w / r_i * (C18 + 2 * r_i * C13);
-			    const double C69 = 2 * k_w / r_i * (C19 + 2 * r_i * C14);
-			    const double C70 = 2 * k_w / r_i * (C20 + 2 * r_i * C15);
-
-			    // Heat source from liquid to wall due to heat flux coefficients
-			    const double C71 = - 2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C16 + 2 * r_i * C11);
-			    const double C72 = - 2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C17 + 2 * r_i * C12);
-			    const double C73 = - 2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C18 + 2 * r_i * C13);
-			    const double C74 = - 2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C19 + 2 * r_i * C14);
-			    const double C75 = - 2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C20 + 2 * r_i * C15);
-
                 // DPcap evaluation
-
-                const double alpha_m0 = r_v * r_v / (r_i * r_i);
-                const double r_p = 1e-5;
-                const double surf_ten_value = vapor_sodium::surf_ten(T_l_iter[i]);
+                const double alpha_m0 = r_v * r_v / (r_i * r_i);                        // Nominal vapor volume fraction (when r_c = infty) [-]
+                const double r_p = 1e-5;                                                // Porosity radius [m]
+                const double surf_ten_value = vapor_sodium::surf_ten(T_l_iter[i]);      // Surface tension [N/m]           
 
                 const double Lambda = 3 * r_v / (eps_s * r_p) * (alpha_m_iter[i] - alpha_m0);
-                DPcap[i] = 0.0;
 
                 if (Lambda <= 0.0) DPcap[i] = 0;
                 else if (Lambda >= 2.0) DPcap[i] = 2 * surf_ten_value / r_p;
@@ -851,6 +857,14 @@ int main() {
                             (mu + (9 * r_v) / (2 * eps_s * alpha_m0 * r_p) * (std::pow(1 - mu * mu, -0.5) - Lambda / mu));
                     }
                 }
+
+                #pragma endregion
+
+                // =======================================================================
+                //
+                //                              [EQUATIONS]
+                //
+                // =======================================================================
 
                 #pragma region equations
 
@@ -1740,9 +1754,10 @@ int main() {
 
                 #pragma endregion
 
-                DenseBlock D_dense = to_dense(D[i]);
+                // Densification of the D block for debug purposes
+                // DenseBlock D_dense = to_dense(D[i]);
 
-                // k + 1 iteration quantities evaluated by k iteration quantities
+                // Secondary quantities evaluated at the k + 1 iteration using by k iteration quantities
 
                 heat_source_wall_liquid_flux[i] = C66 * p_m_iter[i] + C67 * T_m_iter[i] + C68 * T_l_iter[i] + C69 * T_w_iter[i] + C70;
                 heat_source_liquid_wall_flux[i] = C71 * p_m_iter[i] + C72 * T_m_iter[i] + C73 * T_l_iter[i] + C74 * T_w_iter[i] + C75;
@@ -1932,84 +1947,6 @@ int main() {
             for (int k = 0; k < B; ++k)
                 L_pic[k] /= N;
 
-            // Calculate Picard error
-            /*
-            L1 = 0.0;
-
-			double Aold, Anew, denom, eps;
-
-            for (int i = 0; i < N; ++i) {
-
-                Aold = rho_m_iter[i];
-                Anew = X[i][0];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = rho_l_iter[i];
-                Anew = X[i][1];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = alpha_m_iter[i];
-                Anew = X[i][2];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = alpha_l_iter[i];
-                Anew = X[i][3];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = p_m_iter[i];
-                Anew = X[i][4];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = p_l_iter[i];
-                Anew = X[i][5];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = v_m_iter[i];
-                Anew = X[i][6];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = v_l_iter[i];
-                Anew = X[i][7];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = T_m_iter[i];
-                Anew = X[i][8];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = T_l_iter[i];
-                Anew = X[i][9];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-
-                Aold = T_w_iter[i];
-                Anew = X[i][10];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L1 += eps;
-            }
-            */
-
-            // L1 /= (N * B);
-
             // Update vectors from X
             for (int i = 0; i < N; ++i) {
                 rho_m[i] = X[i][0];
@@ -2024,15 +1961,17 @@ int main() {
                 T_l[i] = X[i][9];
                 T_w[i] = X[i][10];     
 
-                // Check linearization error of mass source
-                Gamma_xv_diff[i] = Gamma_xv_approx[i] - Gamma_xv[i];
-                Gamma_xv_diff2[i] = Gamma_xv_approx[i] - Gamma_xv_lin[i];
-                Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
+                // Check linearization error of mass source for debugging purposes
+                // Gamma_xv_diff[i] = Gamma_xv_approx[i] - Gamma_xv[i];
+                // Gamma_xv_diff2[i] = Gamma_xv_approx[i] - Gamma_xv_lin[i];
+                // Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
             }
 
+            // Check if variable converged
             for (int k = 0; k < B; ++k)
                 conv_var[k] = (L_pic[k] < pic_tol[k]);
 
+            // Check if all variables converged
             bool conv_all = true;
             for (int k = 0; k < B; ++k)
                 conv_all = conv_all && conv_var[k];
@@ -2062,10 +2001,10 @@ int main() {
 
                     energy_balance += dt * lateral_surface * q_pp[i];
 
-                    mass_tot += Gamma_xv[i];
+                    mass_tot += Gamma_xv[i];                                // Should be zero at steady-state
                 }
 
-                energy_diff = (E_tot_new - E_tot_old) - energy_balance; // Should be zero
+                energy_diff = (E_tot_new - E_tot_old) - energy_balance;     // Should be zero at steady-state
 
                 double S_wl = 0, S_vl = 0, S_pc = 0;
                 for (int i = 0; i < N; ++i) {
@@ -2075,7 +2014,7 @@ int main() {
                 }
 
                 halves = 0;             // Reset halves if Picard converged
-                break;                  // Picard converged
+                break;                  // Picard converged, so break the loops
             }
         }
 
@@ -2097,7 +2036,7 @@ int main() {
                 T_w_old[i] = X[i][10];
             }
 
-			time_total += dt;
+			time_total += dt;       // Advance in time
 
         } else {
 
@@ -2116,9 +2055,17 @@ int main() {
                 T_w[i] = T_w_old[i];
             }
 
-			halves += 1;
-            n -= 1;
+			halves += 1;        // Half again the timestep
+            n -= 1;             // No time iteration considered
         }
+
+        // =======================================================================
+        //
+        //                              [OUTPUT]
+        //
+        // =======================================================================
+
+        #pragma region output
 
         const int output_every = 10;
 
@@ -2217,6 +2164,8 @@ int main() {
 
             time_output.flush();
         }
+
+        #pragma endregion
     }
 
     v_velocity_output.close();
