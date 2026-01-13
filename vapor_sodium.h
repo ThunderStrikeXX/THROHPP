@@ -36,44 +36,7 @@ namespace vapor_sodium {
         return Y0 + (T - T0) / (T1 - T0) * (Y1 - Y0);
     }
 
-    /**
-      * @brief Enthalpy of sodium vapor [J/kg] from NIST Shomate equation.
-      * Valid for 1170.525 K ≤ T ≤ 6000 K.
-      * Reference state: H(298.15 K) = 0 (per NIST convention).
-      *
-      * @param T Temperature [K]
-      * @return Enthalpy of sodium vapor [J/kg]
-
-    inline double h(double T) {
-        constexpr double T_min = 1170.525;
-        constexpr double T_max = 6000.0;
-        if (T < T_min) T = T_min;
-        if (T > T_max) T = T_max;
-
-        const double A = 20.80573;
-        const double B = 0.277206;
-        const double C = -0.392086;
-        const double D = 0.119634;
-        const double E = -0.008879;
-        const double F = 101.0386;
-        const double H = 107.2999;
-
-        double t = T / 1000.0;
-
-        double H_kJ_per_mol = A * t
-            + B * t * t / 2.0
-            + C * t * t * t / 3.0
-            + D * t * t * t * t / 4.0
-            - E / t
-            + F
-            - H;
-
-        const double M_kg_per_mol = 22.98976928e-3;
-        return (H_kJ_per_mol * 1000.0) / M_kg_per_mol; // J/kg
-    }      */
-
-    /// Enthalpy of liquid sodium [J/kg]
-    /// CODATA correlation
+    /// Enthalpy of liquid sodium [J/kg] (CODATA correlation)
     inline double h_liquid_sodium(double T) {
         // Numerical safety only
         if (T < 300.0)  T = 300.0;
@@ -257,43 +220,6 @@ namespace vapor_sodium {
     }    
 
     /**
-    * @brief Nusselt number [-] (Gnielinski correlation) as a function of Reynolds number
-    * Retrieves an error if Re < 0 or Nu < 0.
-
-    inline double Nu(double Re, double Pr) {
-
-        if (Re < 0.0 || Pr < 0.0)
-            throw std::invalid_argument("Error: Re or Pr < 0");
-
-        const double Nu_lam = 4.36;
-
-        // Puramente laminare
-        if (Re <= 1000.0)
-            return Nu_lam;
-
-        // Incremento turbolento (Gnielinski) per Re > 1000
-        const double f = vapor_sodium::f(Re);
-        const double fp8 = f / 8.0;
-        const double num = fp8 * (Re - 1000.0) * Pr;
-        const double den = 1.0 + 12.7 * std::sqrt(fp8) * (std::cbrt(Pr * Pr) - 1.0);
-
-        const double Nu_turb_inc = num / den;  // = 0 a Re = 1000
-
-        // Valore totale: laminare + incremento turbolento
-        return Nu_lam + Nu_turb_inc;
-    }    */
-
-    /**
-    * @brief Convective heat transfer coefficient [W/m^2/K] as a function of Reynolds number
-    * Retrieves an error if Re < 0 or Nu < 0.
-
-    inline double h_conv(double Re, double Pr, double k, double Dh) {
-
-        const double Nu = vapor_sodium::Nu(Re, Pr);
-        return Nu * k / Dh;
-    }    */
-
-    /**
      * @brief Convective heat transfer coefficient [W/m^2/K]
      *        with smooth blending between laminar and Gnielinski turbulent regimes.
      *
@@ -365,4 +291,29 @@ namespace vapor_sodium {
         return val > 0.0 ? val : 0.0;
     }
 
+    /**
+    * @brief Specific heat at constant volume from table interpolation [J/(kg*K)]
+    *        Fink & Leibowitz
+    */
+    inline double cv(double T) {
+
+        static const std::array<double, 22> Tgrid =
+        { 400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,
+          1600,1700,1800,1900,2000,2100,2200,2300,2400, 2500 };
+
+        // valori convertiti in J/kgK (kJ/kgK * 1000)
+        static const std::array<double, 22> Cvgrid =
+        { 490, 840, 1310, 1710, 1930, 1980, 1920, 1810, 1680, 1580, 1510, 1440, 1390, 1380, 1360, 1300, 1300, 1300, 1340, 1760, 17030 };
+
+        // valore tabellato a 2500 K = 17.03 kJ/kgK
+        if (T >= 2500.0) return 17030.0;
+
+        return interp_T(Tgrid, Cvgrid, T);
+    }
+
+    inline double gamma(double T) {
+        double cp_val = cp(T);
+        double cv_val = cv(T);
+        return cp_val / cv_val;
+    }
 }
