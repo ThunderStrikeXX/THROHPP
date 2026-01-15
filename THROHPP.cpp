@@ -26,9 +26,9 @@ int main() {
     //
     // =======================================================================
 
-#pragma region constants_and_variables
+    #pragma region constants_and_variables
 
-// Mathematical constants
+    // Mathematical constants
     const double M_PI = 3.14159265358979323846;
 
     // Physical properties
@@ -78,9 +78,9 @@ int main() {
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-3;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-4;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
-    const int tot_iter = 1e10;                          /// Number of timesteps [-]
+    const int tot_iter = 1e8;                           /// Number of timesteps [-]
     double time_total = 0.0;                            /// Total time elapsed [s]
     int halves = 0;                                     /// Number of times the time step has been halved [-]
 
@@ -90,27 +90,22 @@ int main() {
     std::array<double, B> L_pic;                        /// Picard residuals [-]
     std::array<bool, B> conv_var;                       /// Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   /// Tolerance for the convergence of Picard loop [-]
-        1e-6,  // rho_m
-        1e-6,  // rho_l
-        1e-6,  // alpha_m
-        1e-6,  // alpha_l
-        1e-6,  // p_m
-        1e-6,  // p_l
-        1e-6,  // v_m
-        1e-6,  // v_l
-        1e-6,  // T_m
-        1e-6,  // T_l
-        1e-6   // T_w
+        1e-4,  // rho_m
+        1e-4,  // rho_l
+        1e-4,  // alpha_m
+        1e-4,  // alpha_l
+        1e-2,  // p_m
+        1e-2,  // p_l
+        1e-2,  // v_m
+        1e-2,  // v_l
+        1e-4,  // T_m
+        1e-4,  // T_l
+        1e-4   // T_w
     };
 
     // Mesh z positions
     std::vector<double> mesh(N, 0.0);
     for (int i = 0; i < N; ++i) mesh[i] = i * dz;     /// Mesh discretization
-
-    // Node partition
-    const int N_e = static_cast<int>(std::floor(evaporator_length / dz));   /// Number of nodes of the evaporator region [-]
-    const int N_c = static_cast<int>(std::ceil(condenser_length / dz));     /// Number of nodes of the condenser region [-]
-    const int N_a = N - (N_e + N_c);                                        /// Number of nodes of the adiabadic region [-]
 
     // State variables definition and initialization
     std::vector<double> rho_m(N, 0.01);                 /// Mixture density [kg/m3]
@@ -119,7 +114,7 @@ int main() {
     std::vector<double> alpha_l(N, 0.1);                /// Liquid volume fraction [-]
     std::vector<double> p_m(N);                         /// Mixture pressure [Pa]
     std::vector<double> p_l(N);                         /// Liquid pressure [Pa]
-    std::vector<double> v_m(N, 10.0);                  /// Mixture velocity [m/s]
+    std::vector<double> v_m(N, 1.0);                  /// Mixture velocity [m/s]
     std::vector<double> v_l(N, -0.01);                  /// Liquid velocity [m/s]
     std::vector<double> T_m(N);                         /// Mixture bulk temperature [K]
     std::vector<double> T_l(N);                         /// Liquid bulk temperature [K]
@@ -324,7 +319,6 @@ int main() {
     for (int n = 0; n < tot_iter; ++n) {
 
         // Timestep selection
-        dt = dt_user;                                       // Default --> user chosen timestep
         dt = std::max(dt_user * pow(0.5, halves), 1e-10);    // Halfing of the timestep up to a lower bound     
 
         // Picard iteration loop
@@ -395,27 +389,17 @@ int main() {
                         + (vapor_sodium::h(T_m_iter[i]) - vapor_sodium::h(T_sur_iter[i]));
                 }
 
-
                 // Omega factor definition (at the moment, not active)
                 double Omega = 1.0;
-
-                // const double b = -phi_x_v_iter[i] / (p_m_iter[i] * std::sqrt(2.0 / (Rv * T_m_iter[i])));
-                // if (b < 0.1192) Omega = 1.0 + b * std::sqrt(M_PI);
-                // else if (b <= 0.9962) Omega = 0.8959 + 2.6457 * b;
-                // else Omega = 2.0 * b * std::sqrt(M_PI);
 
                 // Gamma coefficients definition (everything is calculated using iter (k-iteration) values)
                 const double Kgeom = 2.0 * r_v * eps_s / (r_i * r_i);
                 const double beta = 1.0 / std::sqrt(2.0 * M_PI * Rv * T_sur_iter[i]);
-                const double betap = -0.5 * beta / T_sur_iter[i];
 
                 const double Psat = vapor_sodium::P_sat(T_sur_iter[i]);
                 const double dPsat = vapor_sodium::dP_sat_dT(T_sur_iter[i]);
 
-                // const double Gk = Kgeom * beta * (sigma_e * Psat - sigma_c * p_m_iter[i]); // EXACT Gamma at k
-
                 cGamma[i] = Kgeom * beta * (-sigma_c);
-                // bGamma[i] = Kgeom * (betap * (sigma_e * Psat - sigma_c * p_m_iter[i]) + beta * (sigma_e * dPsat));
 				bGamma[i] = - Gamma_xv_iter[i] / (2 * T_sur_iter[i]) + Kgeom * beta * (sigma_e * dPsat);
                 aGamma[i] = Gamma_xv_iter[i] - bGamma[i] * T_sur_iter[i];
 
@@ -742,12 +726,12 @@ int main() {
                 Q[i][1] =
 
                     // Temporal term
-                    +eps_v * (rho_l_iter[i] * alpha_l_iter[i]) / dt
+                    + eps_v * (rho_l_iter[i] * alpha_l_iter[i]) / dt
                     + eps_v * (rho_l_old[i] * alpha_l_old[i]) / dt
 
                     // Convective term
                     + 2 * (
-                        +eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i] * H(v_l_iter[i]))
+                        + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i] * H(v_l_iter[i]))
                         + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i])))
                         - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1]))
                         - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1])))
@@ -874,9 +858,9 @@ int main() {
                 Q[i][2] = 0.0
 
                     // Temporal term (cross terms version)
-                    // + (alpha_m_iter[i] * cv_m_p * T_m_iter[i] * rho_m_old[i]) / dt
-                    // + (alpha_m_iter[i] * cv_m_p * T_m_old[i] * rho_m_iter[i]) / dt
-                    // + (alpha_m_old[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
+                    + (alpha_m_iter[i] * cv_m_p * T_m_iter[i] * rho_m_old[i]) / dt
+                    + (alpha_m_iter[i] * cv_m_p * T_m_old[i] * rho_m_iter[i]) / dt
+                    + (alpha_m_old[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
 
                     // Temporal term (conservation version)
                     + 2 * (alpha_m_iter[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
@@ -1042,13 +1026,13 @@ int main() {
                 Q[i][3] = 0.0
 
                     // Temporal term (cross terms)
-                    // + (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * rho_l_old[i]) / dt
-                    // + (alpha_l_iter[i] * cp_l_p * T_l_old[i] * rho_l_iter[i]) / dt
-                    // + (alpha_l_old[i] * cp_l_p * T_l_iter[i] * rho_l_iter[i]) / dt
+                    + (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * rho_l_old[i]) / dt
+                    + (alpha_l_iter[i] * cp_l_p * T_l_old[i] * rho_l_iter[i]) / dt
+                    + (alpha_l_old[i] * cp_l_p * T_l_iter[i] * rho_l_iter[i]) / dt
 
                     // Temporal term (conservative terms)
-                    +2 * (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * rho_l_iter[i]) / dt
-                    + (alpha_l_old[i] * cp_l_p * T_l_old[i] * rho_l_old[i]) / dt
+                    // + 2 * (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * rho_l_iter[i]) / dt
+                    // + (alpha_l_old[i] * cp_l_p * T_l_old[i] * rho_l_old[i]) / dt
 
                     // Convective term
                     + 3 * (
@@ -1246,13 +1230,13 @@ int main() {
                 Q[i][5] =
 
                     // Temporal term (cross terms)
-                    // + (alpha_m_iter[i] * rho_m_iter[i] + alpha_m_iter[i + 1] * rho_m_iter[i + 1]) * v_m_old[i] / (2 * dt)
-                    // + ((alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] * (rho_m_old[i] + rho_m_old[i + 1])) / (4 * dt)
-                    // + ((rho_m_iter[i] + rho_m_iter[i + 1]) * v_m_iter[i] * (alpha_m_old[i] + alpha_m_old[i + 1])) / (4 * dt)
+                    + (alpha_m_iter[i] * rho_m_iter[i] + alpha_m_iter[i + 1] * rho_m_iter[i + 1]) * v_m_old[i] / (2 * dt)
+                    + ((alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] * (rho_m_old[i] + rho_m_old[i + 1])) / (4 * dt)
+                    + ((rho_m_iter[i] + rho_m_iter[i + 1]) * v_m_iter[i] * (alpha_m_old[i] + alpha_m_old[i + 1])) / (4 * dt)
 
                     // Temporal term (conservative terms)
-                    +(alpha_m_old[i] * rho_m_old[i] + alpha_m_old[i + 1] * rho_m_old[i + 1]) * v_m_old[i] / (4 * dt)
-                    + (alpha_m_iter[i] * rho_m_iter[i] + alpha_m_iter[i + 1] * rho_m_iter[i + 1]) * v_m_iter[i] / (4 * dt)
+                    // + (alpha_m_old[i] * rho_m_old[i] + alpha_m_old[i + 1] * rho_m_old[i + 1]) * v_m_old[i] / (4 * dt)
+                    // + (alpha_m_iter[i] * rho_m_iter[i] + alpha_m_iter[i + 1] * rho_m_iter[i + 1]) * v_m_iter[i] / (4 * dt)
 
                     + ((alpha_m_old[i] + alpha_m_old[i + 1]) * v_m_old[i] * (rho_m_old[i] + rho_m_old[i + 1])) / (8 * dt)
                     + ((alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] * (rho_m_iter[i] + rho_m_iter[i + 1])) / (8 * dt)
@@ -1319,7 +1303,7 @@ int main() {
                 add(D[i], 6, 1,
 
                     // Temporal term (central differences)
-                    +eps_v * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (4 * dt)
+                    + eps_v * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (4 * dt)
 
                     // Convective term
                     - eps_v * (H(v_l_iter[i]) * alpha_l_iter[i] * v_l_iter[i - 1] * v_l_iter[i - 1]) / dz
@@ -1348,7 +1332,7 @@ int main() {
                 add(D[i], 6, 7,
 
                     // Temporal term (central differences)
-                    +eps_v * (alpha_l_iter[i] * rho_l_iter[i] + alpha_l_iter[i + 1] * rho_l_iter[i + 1]) / (2 * dt)
+                    + eps_v * (alpha_l_iter[i] * rho_l_iter[i] + alpha_l_iter[i + 1] * rho_l_iter[i + 1]) / (2 * dt)
 
                     // Convective term
                     + 2 * eps_v * (H(v_l_iter[i]) * alpha_l_iter[i + 1] * rho_l_iter[i + 1] * v_l_iter[i]) / dz
@@ -1361,13 +1345,13 @@ int main() {
                 Q[i][6] =
 
                     // Temporal term (central differeces)
-                    // + eps_v * (alpha_l_iter[i] * rho_l_iter[i] + alpha_l_iter[i + 1] * rho_l_iter[i + 1]) * v_l_old[i] / (2 * dt)
-                    // + eps_v * ((alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] * (rho_l_old[i] + rho_l_old[i + 1])) / (4 * dt)
-                    // + eps_v * ((rho_l_iter[i] + rho_l_iter[i + 1]) * v_l_iter[i] * (alpha_l_old[i] + alpha_l_old[i + 1])) / (4 * dt)
+                    + eps_v * (alpha_l_iter[i] * rho_l_iter[i] + alpha_l_iter[i + 1] * rho_l_iter[i + 1]) * v_l_old[i] / (2 * dt)
+                    + eps_v * ((alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] * (rho_l_old[i] + rho_l_old[i + 1])) / (4 * dt)
+                    + eps_v * ((rho_l_iter[i] + rho_l_iter[i + 1]) * v_l_iter[i] * (alpha_l_old[i] + alpha_l_old[i + 1])) / (4 * dt)
 
                     // Temporal term (conservative terms)
-                    +eps_v * (alpha_l_old[i] * rho_l_old[i] + alpha_l_old[i + 1] * rho_l_old[i + 1]) * v_l_old[i] / (4 * dt)
-                    + eps_v * (alpha_l_iter[i] * rho_l_iter[i] + alpha_l_iter[i + 1] * rho_l_iter[i + 1]) * v_l_iter[i] / (4 * dt)
+                    // + eps_v * (alpha_l_old[i] * rho_l_old[i] + alpha_l_old[i + 1] * rho_l_old[i + 1]) * v_l_old[i] / (4 * dt)
+                    // + eps_v * (alpha_l_iter[i] * rho_l_iter[i] + alpha_l_iter[i + 1] * rho_l_iter[i + 1]) * v_l_iter[i] / (4 * dt)
 
                     + eps_v * ((alpha_l_old[i] + alpha_l_old[i + 1]) * v_l_old[i] * (rho_l_old[i] + rho_l_old[i + 1])) / (8 * dt)
                     + eps_v * ((alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] * (rho_l_iter[i] + rho_l_iter[i + 1])) / (8 * dt)
@@ -1389,13 +1373,13 @@ int main() {
                 add(L[i], 6, 6,
 
                     // Convective term
-                    -2 * eps_v * (H(v_l_iter[i]) * alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i - 1]) / dz
+                    - 2 * eps_v * (H(v_l_iter[i]) * alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i - 1]) / dz
                 );
 
                 add(R[i], 6, 1,
 
                     // Temporal term (central differences)
-                    +eps_v * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (4 * dt)
+                    + eps_v * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (4 * dt)
 
                     // Convective term
                     + eps_v * (H(v_l_iter[i]) * alpha_l_iter[i + 1] * v_l_iter[i] * v_l_iter[i]) / dz
@@ -1408,7 +1392,7 @@ int main() {
                 add(R[i], 6, 3,
 
                     // Temporal term (central differences)
-                    +eps_v * (rho_l_iter[i] + rho_l_iter[i + 1]) * v_l_iter[i] / (4 * dt)
+                    + eps_v * (rho_l_iter[i] + rho_l_iter[i + 1]) * v_l_iter[i] / (4 * dt)
 
                     // Convective term
                     + eps_v * (H(v_l_iter[i]) * rho_l_iter[i + 1] * v_l_iter[i] * v_l_iter[i]) / dz
@@ -1732,7 +1716,7 @@ int main() {
         }
 
         // Picard converged or max iterations reached
-        if (pic != max_picard) {
+        if (true/*pic != max_picard*/) {
 
             // Update n values (old = new) and update total time
             for (int i = 0; i < N; ++i) {
