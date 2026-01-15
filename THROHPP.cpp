@@ -13,8 +13,6 @@
 #include <cassert>
 #include <string>
 
-bool warnings = false;
-
 #include "steel.h"
 #include "liquid_sodium.h"
 #include "vapor_sodium.h"
