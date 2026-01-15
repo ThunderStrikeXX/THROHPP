@@ -230,7 +230,7 @@ namespace vapor_sodium {
         double Dh
     ) {
         if (Re < 0.0 || Pr < 0.0)
-            throw std::invalid_argument("Error: Re or Pr <= 0");
+            throw std::invalid_argument("Error: Re or Pr < 0");
 
         // -----------------------------
         // Parameters
