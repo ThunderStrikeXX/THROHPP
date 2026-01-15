@@ -78,7 +78,7 @@ int main() {
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-4;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-6;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
     const int tot_iter = 1e10;                          /// Number of timesteps [-]
     double time_total = 0.0;                            /// Total time elapsed [s]
@@ -119,7 +119,7 @@ int main() {
     std::vector<double> alpha_l(N, 0.1);                /// Liquid volume fraction [-]
     std::vector<double> p_m(N);                         /// Mixture pressure [Pa]
     std::vector<double> p_l(N);                         /// Liquid pressure [Pa]
-    std::vector<double> v_m(N, 100.0);                  /// Mixture velocity [m/s]
+    std::vector<double> v_m(N, 1.0);                  /// Mixture velocity [m/s]
     std::vector<double> v_l(N, -0.01);                  /// Liquid velocity [m/s]
     std::vector<double> T_m(N);                         /// Mixture bulk temperature [K]
     std::vector<double> T_l(N);                         /// Liquid bulk temperature [K]
@@ -223,9 +223,9 @@ int main() {
     std::vector<SparseBlock> L(N), D(N), R(N);
     std::vector<VecBlock> Q(N), X(N);
 
-#pragma endregion
+    #pragma endregion
 
-#pragma region output
+    #pragma region output
 
     // Create result folder
     int new_case = 0;
@@ -305,7 +305,14 @@ int main() {
     mesh_output.flush();
     mesh_output.close();
 
-#pragma endregion
+    // Vapor Equation of State update function. Updates density
+    auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
+
+        for (int i = 0; i < N; i++) { rho_[i] = std::max(1e-6, p_[i] / (Rv * T_[i])); }
+
+    }; eos_update(rho_m, p_m, T_m);
+
+    #pragma endregion
 
     /// Print number of working threads
     std::cout << "Threads: " << omp_get_max_threads() << "\n";
@@ -870,7 +877,7 @@ int main() {
                     // + (alpha_m_old[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
 
                     // Temporal term (conservation version)
-                    +2 * (alpha_m_iter[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
+                    + 2 * (alpha_m_iter[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
                     + (alpha_m_old[i] * cv_m_p * T_m_old[i] * rho_m_old[i]) / dt
 
                     // Convective term
@@ -944,7 +951,7 @@ int main() {
                 add(R[i], 2, 8, 0.0
 
                     // Convective term
-                    + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cp_m_r * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                    + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Diffusion term
                     - (alpha_m_iter[i + 1] * k_m_r) / (2 * dz * dz)
@@ -1773,7 +1780,7 @@ int main() {
 
         #pragma region output
 
-        const int output_every = 10;
+        const int output_every = 1;
 
         if (n % output_every == 0) {
             for (int i = 0; i < N; ++i) {
