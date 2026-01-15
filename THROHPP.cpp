@@ -78,7 +78,7 @@ int main() {
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-6;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-3;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
     const int tot_iter = 1e10;                          /// Number of timesteps [-]
     double time_total = 0.0;                            /// Total time elapsed [s]
@@ -90,17 +90,17 @@ int main() {
     std::array<double, B> L_pic;                        /// Picard residuals [-]
     std::array<bool, B> conv_var;                       /// Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   /// Tolerance for the convergence of Picard loop [-]
-        1e-5,  // rho_m
-        1e-5,  // rho_l
+        1e-6,  // rho_m
+        1e-6,  // rho_l
         1e-6,  // alpha_m
         1e-6,  // alpha_l
-        1e-2,  // p_m
-        1e-2,  // p_l
-        1e-4,  // v_m
-        1e-4,  // v_l
-        1e-4,  // T_m
-        1e-4,  // T_l
-        1e-4   // T_w
+        1e-6,  // p_m
+        1e-6,  // p_l
+        1e-6,  // v_m
+        1e-6,  // v_l
+        1e-6,  // T_m
+        1e-6,  // T_l
+        1e-6   // T_w
     };
 
     // Mesh z positions
@@ -119,7 +119,7 @@ int main() {
     std::vector<double> alpha_l(N, 0.1);                /// Liquid volume fraction [-]
     std::vector<double> p_m(N);                         /// Mixture pressure [Pa]
     std::vector<double> p_l(N);                         /// Liquid pressure [Pa]
-    std::vector<double> v_m(N, 1.0);                  /// Mixture velocity [m/s]
+    std::vector<double> v_m(N, 10.0);                  /// Mixture velocity [m/s]
     std::vector<double> v_l(N, -0.01);                  /// Liquid velocity [m/s]
     std::vector<double> T_m(N);                         /// Mixture bulk temperature [K]
     std::vector<double> T_l(N);                         /// Liquid bulk temperature [K]
@@ -128,8 +128,9 @@ int main() {
     // Secondary useful variables
     std::vector<double> Gamma_xv(N, 0.0);                           /// Exact mass volumetric source [kg/m3s]
     std::vector<double> Gamma_xv_lin(N, 0.0);                       /// Linearized mass volumetric source (with C coefficients) [kg/m3s]
-    std::vector<double> Gamma_xv_diff(N, 0.0);                      /// Residual between approximation and exact mass volumetric source 1 [kg/m3s]
-    std::vector<double> Gamma_xv_diff2(N, 0.0);                     /// Residual between approximation and exact mass volumetric source 2 [kg/m3s]
+    std::vector<double> Gamma_xv_approx_error(N, 0.0);                      /// Residual between approximation and exact mass volumetric source 1 [kg/m3s]
+    std::vector<double> Gamma_xv_lin_error(N, 0.0);                     /// Residual between approximation and exact mass volumetric source 2 [kg/m3s]
+    std::vector<double> Gamma_xv_diff_error(N, 0.0);
     std::vector<double> Gamma_xv_approx(N, 0.0);                    /// Approximated mass volumetric source (with gamma coefficients) [kg/m3s]
     std::vector<double> T_sur(N);                                   /// Wick-vapor surface temperature [K]
     std::vector<double> q_pp(N, 0.0);                               /// Heat flux profile [W/m^2]
@@ -152,8 +153,8 @@ int main() {
     double h_xv_v;                                                  /// Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
-    const double T_left = 800.0;                        /// First node initialization temperature [K]
-    const double T_right = 750.0;                       /// Last node initialization temperature [K]
+    const double T_left = 900.0;                        /// First node initialization temperature [K]
+    const double T_right = 900.0;                       /// Last node initialization temperature [K]
 
     // Temperatures initialization
     for (int i = 0; i < N; ++i) {
@@ -324,7 +325,7 @@ int main() {
 
         // Timestep selection
         dt = dt_user;                                       // Default --> user chosen timestep
-        dt = std::max(dt_user * pow(0.5, halves), 1e-7);    // Halfing of the timestep up to a lower bound     
+        dt = std::max(dt_user * pow(0.5, halves), 1e-10);    // Halfing of the timestep up to a lower bound     
 
         // Picard iteration loop
         for (pic = 0; pic < max_picard; ++pic) {
@@ -411,11 +412,12 @@ int main() {
                 const double Psat = vapor_sodium::P_sat(T_sur_iter[i]);
                 const double dPsat = vapor_sodium::dP_sat_dT(T_sur_iter[i]);
 
-                const double Gk = Kgeom * beta * (sigma_e * Psat - sigma_c * p_m_iter[i]); // EXACT Gamma at k
+                // const double Gk = Kgeom * beta * (sigma_e * Psat - sigma_c * p_m_iter[i]); // EXACT Gamma at k
 
                 cGamma[i] = Kgeom * beta * (-sigma_c);
-                bGamma[i] = Kgeom * (betap * (sigma_e * Psat - sigma_c * p_m_iter[i]) + beta * (sigma_e * dPsat));
-                aGamma[i] = Gk - bGamma[i] * T_sur_iter[i];
+                // bGamma[i] = Kgeom * (betap * (sigma_e * Psat - sigma_c * p_m_iter[i]) + beta * (sigma_e * dPsat));
+				bGamma[i] = - Gamma_xv_iter[i] / (2 * T_sur_iter[i]) + Kgeom * beta * (sigma_e * dPsat);
+                aGamma[i] = Gamma_xv_iter[i] - bGamma[i] * T_sur_iter[i];
 
                 // Radial model constants
                 const double Ex3 = H_xm + (h_vx_x * r_i * r_i) / (2.0 * r_v) * bGamma[i];
@@ -1483,9 +1485,7 @@ int main() {
                 T_sur[i] = C36 * p_m_iter[i] + C37 * T_m_iter[i] + C38 * T_l_iter[i] + C39 * T_w_iter[i] + C40;
 
                 phi_x_v[i] = beta * (sigma_e * p_saturation[i] - sigma_c * Omega * p_m_iter[i]);
-
                 Gamma_xv[i] = 2 * r_v * eps_s / (r_i * r_i) * phi_x_v[i];
-
                 Gamma_xv_lin[i] = C41 * p_m_iter[i] + C42 * T_m_iter[i] + C43 * T_l_iter[i] + C44 * T_w_iter[i] + C45;
 
                 energy_wall[i] = rho_w_p * cp_w_p * T_w_iter[i] * V_wall;
@@ -1674,9 +1674,10 @@ int main() {
                 T_w[i] = X[i][10];
 
                 // Check linearization error of mass source for debugging purposes
-                // Gamma_xv_diff[i] = Gamma_xv_approx[i] - Gamma_xv[i];
-                // Gamma_xv_diff2[i] = Gamma_xv_approx[i] - Gamma_xv_lin[i];
-                // Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
+                Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur_iter[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
+                Gamma_xv_approx_error[i] = Gamma_xv[i] - Gamma_xv_approx[i];
+                Gamma_xv_lin_error[i] = Gamma_xv[i] - Gamma_xv_lin[i];
+                Gamma_xv_diff_error[i] = Gamma_xv_approx[i] - Gamma_xv_lin[i];
             }
 
             // Check if variable converged
@@ -1750,6 +1751,103 @@ int main() {
 
             time_total += dt;       // Advance in time
 
+            const int output_every = 1;
+
+            if (n % output_every == 0) {
+                for (int i = 0; i < N; ++i) {
+
+                    v_velocity_output << X[i][6] << " ";
+                    v_pressure_output << X[i][4] << " ";
+                    v_temperature_output << X[i][8] << " ";
+                    v_rho_output << X[i][0] << " ";
+
+                    l_velocity_output << X[i][7] << " ";
+                    l_pressure_output << X[i][5] << " ";
+                    l_temperature_output << X[i][9] << " ";
+                    l_rho_output << X[i][1] << " ";
+
+                    w_temperature_output << X[i][10] << " ";
+
+                    v_alpha_output << X[i][2] << " ";
+                    l_alpha_output << X[i][3] << " ";
+
+                    gamma_output << Gamma_xv[i] << " ";
+                    phi_output << phi_x_v[i] << " ";
+
+                    hs_wl_flux_output << heat_source_wall_liquid_flux[i] << " ";
+                    hs_lw_flux_output << heat_source_liquid_wall_flux[i] << " ";
+
+                    hs_vl_phase_output << heat_source_vapor_liquid_phase[i] << " ";
+                    hs_lv_phase_output << heat_source_liquid_vapor_phase[i] << " ";
+
+                    hs_vl_flux_output << heat_source_vapor_liquid_flux[i] << " ";
+                    hs_lv_flux_output << heat_source_liquid_vapor_flux[i] << " ";
+
+                    psat_output << p_saturation[i] << " ";
+                    tsur_output << T_sur[i] << " ";
+                }
+
+                time_output << time_total << " ";
+
+                v_velocity_output << "\n";
+                v_pressure_output << "\n";
+                v_temperature_output << "\n";
+                v_rho_output << "\n";
+
+                l_velocity_output << "\n";
+                l_pressure_output << "\n";
+                l_temperature_output << "\n";
+                l_rho_output << "\n";
+
+                w_temperature_output << "\n";
+
+                v_alpha_output << "\n";
+                l_alpha_output << "\n";
+
+                gamma_output << "\n";
+                phi_output << "\n";
+
+                hs_wl_flux_output << "\n";
+                hs_lw_flux_output << "\n";
+
+                hs_vl_phase_output << "\n";
+                hs_lv_phase_output << "\n";
+
+                hs_vl_flux_output << "\n";
+                hs_lv_flux_output << "\n";
+
+                psat_output << "\n";
+                tsur_output << "\n";
+
+
+                v_velocity_output.flush();
+                v_pressure_output.flush();
+                v_temperature_output.flush();
+                v_rho_output.flush();
+
+                l_velocity_output.flush();
+                l_pressure_output.flush();
+                l_temperature_output.flush();
+                l_rho_output.flush();
+
+                w_temperature_output.flush();
+
+                v_alpha_output.flush();
+                l_alpha_output.flush();
+
+                gamma_output.flush();
+                phi_output.flush();
+                hs_wl_flux_output.flush();
+                hs_lw_flux_output.flush();
+                hs_vl_phase_output.flush();
+                hs_lv_phase_output.flush();
+                hs_vl_flux_output.flush();
+                hs_lv_flux_output.flush();
+                psat_output.flush();
+                tsur_output.flush();
+
+                time_output.flush();
+            }
         }
         else {
 
@@ -1771,114 +1869,6 @@ int main() {
             halves += 1;        // Half again the timestep
             n -= 1;             // No time iteration considered
         }
-
-        // =======================================================================
-        //
-        //                              [OUTPUT]
-        //
-        // =======================================================================
-
-        #pragma region output
-
-        const int output_every = 1;
-
-        if (n % output_every == 0) {
-            for (int i = 0; i < N; ++i) {
-
-                v_velocity_output << X[i][6] << " ";
-                v_pressure_output << X[i][4] << " ";
-                v_temperature_output << X[i][8] << " ";
-                v_rho_output << X[i][0] << " ";
-
-                l_velocity_output << X[i][7] << " ";
-                l_pressure_output << X[i][5] << " ";
-                l_temperature_output << X[i][9] << " ";
-                l_rho_output << X[i][1] << " ";
-
-                w_temperature_output << X[i][10] << " ";
-
-                v_alpha_output << X[i][2] << " ";
-                l_alpha_output << X[i][3] << " ";
-
-                gamma_output << Gamma_xv[i] << " ";
-                phi_output << phi_x_v[i] << " ";
-
-                hs_wl_flux_output << heat_source_wall_liquid_flux[i] << " ";
-                hs_lw_flux_output << heat_source_liquid_wall_flux[i] << " ";
-
-                hs_vl_phase_output << heat_source_vapor_liquid_phase[i] << " ";
-                hs_lv_phase_output << heat_source_liquid_vapor_phase[i] << " ";
-
-                hs_vl_flux_output << heat_source_vapor_liquid_flux[i] << " ";
-                hs_lv_flux_output << heat_source_liquid_vapor_flux[i] << " ";
-
-                psat_output << p_saturation[i] << " ";
-                tsur_output << T_sur[i] << " ";
-            }
-
-            time_output << time_total << " ";
-
-            v_velocity_output << "\n";
-            v_pressure_output << "\n";
-            v_temperature_output << "\n";
-            v_rho_output << "\n";
-
-            l_velocity_output << "\n";
-            l_pressure_output << "\n";
-            l_temperature_output << "\n";
-            l_rho_output << "\n";
-
-            w_temperature_output << "\n";
-
-            v_alpha_output << "\n";
-            l_alpha_output << "\n";
-
-            gamma_output << "\n";
-            phi_output << "\n";
-
-            hs_wl_flux_output << "\n";
-            hs_lw_flux_output << "\n";
-
-            hs_vl_phase_output << "\n";
-            hs_lv_phase_output << "\n";
-
-            hs_vl_flux_output << "\n";
-            hs_lv_flux_output << "\n";
-
-            psat_output << "\n";
-            tsur_output << "\n";
-
-
-            v_velocity_output.flush();
-            v_pressure_output.flush();
-            v_temperature_output.flush();
-            v_rho_output.flush();
-
-            l_velocity_output.flush();
-            l_pressure_output.flush();
-            l_temperature_output.flush();
-            l_rho_output.flush();
-
-            w_temperature_output.flush();
-
-            v_alpha_output.flush();
-            l_alpha_output.flush();
-
-            gamma_output.flush();
-            phi_output.flush();
-            hs_wl_flux_output.flush();
-            hs_lw_flux_output.flush();
-            hs_vl_phase_output.flush();
-            hs_lv_phase_output.flush();
-            hs_vl_flux_output.flush();
-            hs_lv_flux_output.flush();
-            psat_output.flush();
-            tsur_output.flush();
-
-            time_output.flush();
-        }
-
-        #pragma endregion
     }
 
     v_velocity_output.close();
