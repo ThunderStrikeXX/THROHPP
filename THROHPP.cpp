@@ -546,7 +546,7 @@ int main() {
                 const double r_p = 1e-5;                                                // Porosity radius [m]
                 const double surf_ten_value = vapor_sodium::surf_ten(T_l_iter[i]);      // Surface tension [N/m]           
 
-                const double Lambda = 3 * r_v / (eps_s * r_p) * (alpha_m_iter[i] - alpha_m0);
+                const double Lambda = 3 * r_v * (alpha_m_iter[i] - alpha_m0) / (2 * alpha_m0 * eps_s * r_p);
 
                 if (Lambda <= 0.0) DPcap[i] = 0;
                 else if (Lambda >= 2.0) DPcap[i] = 2 * surf_ten_value / r_p;
@@ -555,13 +555,13 @@ int main() {
                     double mu = invert(Lambda);
                     if (mu < 1e-3) {
 
-                        DPcap[i] = 2 * surf_ten_value / r_p * (mu + (3 * r_v) / (2 * eps_s * alpha_m0 * r_p) * 0.75);
+                        DPcap[i] = 2 * surf_ten_value / r_p * (mu + (3 * r_v) / (2 * eps_s * alpha_m0 * r_p) * 0.75 * (alpha_m_iter[i] - alpha_m_old[i]));
 
                     }
                     else {
 
                         DPcap[i] = 2 * surf_ten_value / r_p *
-                            (mu + (9 * r_v) / (2 * eps_s * alpha_m0 * r_p) * (std::pow(1 - mu * mu, -0.5) - Lambda / mu));
+                            (mu + (9 * r_v) / (2 * eps_s * alpha_m0 * r_p) * (std::pow(1 - mu * mu, -0.5) - Lambda / mu) * (alpha_m_iter[i] - alpha_m_old[i]));
                     }
                 }
 
