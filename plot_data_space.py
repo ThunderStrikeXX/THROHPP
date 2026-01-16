@@ -124,7 +124,7 @@ units = [
     "[W/m³]",              # heat vapor→liquid (flux)
     "[W/m³]",              # heat liquid→vapor (flux)
     "[Pa]",                # psat
-    "[K]"                  # T_sur
+    "[K]",                  # T_sur
     "[Pa]",
     "[W/m3]"
 ]

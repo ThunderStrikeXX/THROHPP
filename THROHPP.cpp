@@ -396,19 +396,8 @@ int main() {
                         + (vapor_sodium::h(T_m_iter[i]) - vapor_sodium::h(T_sur_iter[i]));
                 }
 
-                const double theta = 0.5 * (1.0 + std::tanh(Gamma_xv_iter[i] / 1e-3));
-
-                h_xv_v =
-                    theta * vapor_sodium::h(T_sur_iter[i])
-                    + (1.0 - theta) * vapor_sodium::h(T_m_iter[i]);
-
-                h_vx_x =
-                    theta * liquid_sodium::h(T_sur_iter[i])
-                    + (1.0 - theta) * (
-                        liquid_sodium::h(T_sur_iter[i])
-                        + vapor_sodium::h(T_m_iter[i])
-                        - vapor_sodium::h(T_sur_iter[i])
-                        );
+                h_xv_v = vapor_sodium::h(T_m_iter[i]);
+                h_vx_x = liquid_sodium::h(T_sur_iter[i]);
 
                 // Omega factor definition (at the moment, not active)
                 double Omega = 1.0;
