@@ -48,7 +48,7 @@ int main() {
     const double sigma_c = 0.05;            /// Condensation accomodation coefficient [-]. 1 means optimal condensation
 
     // Geometric parameters
-    const int N = 20;                                                           /// Number of axial nodes [-]
+    const int N = 40;                                                           /// Number of axial nodes [-]
     const double l = 0.982; 			                                        /// Length of the heat pipe [m]
     const double dz = l / N;                                                    /// Axial discretization step [m]
     const double evaporator_length = 0.502;                                     /// Evaporator length [m]
@@ -72,13 +72,13 @@ int main() {
     const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Environmental boundary conditions
-    const double h_conv = 10;                                                       /// Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const double power = 100;                                                      /// Power at the evaporator side [W]
+    const double h_conv = 1;                                                       /// Convective heat transfer coefficient for external heat removal [W/m^2/K]
+    const double power = 10000;                                                      /// Power at the evaporator side [W]
     const double T_env = 280.0;                                                     /// External environmental temperature [K]
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-5;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-4;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
     const int tot_iter = 1e8;                           /// Number of timesteps [-]
     double time_total = 0.0;                            /// Total time elapsed [s]
@@ -86,7 +86,7 @@ int main() {
 
     // Picard loops parameters	          
     int pic = 0;                                        /// Number of Picard iterations [-]
-    const int max_picard = 100;                         /// Maximum number of Picard iterations per timestep [-]
+    const int max_picard = 30;                         /// Maximum number of Picard iterations per timestep [-]
     std::array<double, B> L_pic;                        /// Picard residuals [-]
     std::array<bool, B> conv_var;                       /// Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   /// Tolerance for the convergence of Picard loop [-]
@@ -110,12 +110,12 @@ int main() {
     // State variables definition and initialization
     std::vector<double> rho_m(N, 0.01);                 /// Mixture density [kg/m3]
     std::vector<double> rho_l(N, 1000);                 /// Liquid density [kg/m3]
-    std::vector<double> alpha_m(N, 0.9);                /// Mixture volume fraction [-]
+    std::vector<double> alpha_m(N, 0.90);                /// Mixture volume fraction [-]
     std::vector<double> alpha_l(N, 0.1);                /// Liquid volume fraction [-]
     std::vector<double> p_m(N);                         /// Mixture pressure [Pa]
     std::vector<double> p_l(N);                         /// Liquid pressure [Pa]
-    std::vector<double> v_m(N, 10.0);                  /// Mixture velocity [m/s]
-    std::vector<double> v_l(N, -0.01);                  /// Liquid velocity [m/s]
+    std::vector<double> v_m(N, 1.0);                  /// Mixture velocity [m/s]
+    std::vector<double> v_l(N, -0.1);                  /// Liquid velocity [m/s]
     std::vector<double> T_m(N);                         /// Mixture bulk temperature [K]
     std::vector<double> T_l(N);                         /// Liquid bulk temperature [K]
     std::vector<double> T_w(N);                         /// Wall bulk temperature [K]
@@ -265,6 +265,9 @@ int main() {
     std::ofstream psat_output(name + "/p_saturation.txt", std::ios::trunc);
     std::ofstream tsur_output(name + "/T_sur.txt", std::ios::trunc);
 
+	std::ofstream dpcap_output(name + "/delta_p_capillary.txt", std::ios::trunc);
+	std::ofstream q_pp_output(name + "/q_pp.txt", std::ios::trunc);
+
     const int global_precision = 8;
 
     mesh_output << std::setprecision(global_precision);
@@ -295,6 +298,10 @@ int main() {
     hs_lv_flux_output << std::setprecision(global_precision);
     psat_output << std::setprecision(global_precision);
     tsur_output << std::setprecision(global_precision);
+
+	dpcap_output << std::setprecision(global_precision);
+
+	q_pp_output << std::setprecision(global_precision);
 
     for (int i = 0; i < N; ++i) mesh_output << i * dz << " ";
 
@@ -373,10 +380,6 @@ int main() {
                 p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                       /// Saturation pressure [Pa]         
                 const double dPsat_dT = vapor_sodium::dP_sat_dT(T_sur_iter[i]);             /// Derivative of the saturation pressure wrt T [Pa/K]   
 
-                h_xv_v = vapor_sodium::h(T_sur_iter[i]);
-                h_vx_x = liquid_sodium::h(T_sur_iter[i]);
-
-                /*
                 // Definition of the enthalpies (as in THROHPUT)
                 if (Gamma_xv_iter[i] >= 0.0) {
 
@@ -392,7 +395,6 @@ int main() {
                     h_vx_x = liquid_sodium::h(T_sur_iter[i])
                         + (vapor_sodium::h(T_m_iter[i]) - vapor_sodium::h(T_sur_iter[i]));
                 }
-                */
 
                 // Omega factor definition (at the moment, not active)
                 double Omega = 1.0;
@@ -525,7 +527,7 @@ int main() {
                 const double C75 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C20 + 2 * r_i * C15);
 
                 // Update heat fluxes at the interfaces
-                if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;                   /// Evaporator imposed heat flux [W/m2]
+                if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;       /// Evaporator imposed heat flux [W/m2]
                 else if (i >= (N - condenser_nodes)) {
 
                     double conv = h_conv *
@@ -533,7 +535,7 @@ int main() {
                     double irr = emissivity * sigma *
                         (std::pow(T_w_iter[i], 4) - std::pow(T_env, 4));    /// Condenser irradiation heat flux [W/m2]
 
-                    q_pp[i] = -(conv + irr);                                            /// Heat flux at the outer wall [W/m2] (positive if to the wall) 
+                    q_pp[i] = -(conv + irr);                                /// Heat flux at the outer wall [W/m2] (positive if to the wall) 
                 }
 
                 // DPcap evaluation
@@ -559,6 +561,8 @@ int main() {
                             (mu + (9 * r_v) / (2 * eps_s * alpha_m0 * r_p) * (std::pow(1 - mu * mu, -0.5) - Lambda / mu));
                     }
                 }
+
+                DPcap[i] = 0.0;
 
                 #pragma endregion
 
@@ -595,7 +599,7 @@ int main() {
                 add(D[i], 0, 4, 0.0
 
                     // Source term
-                    - C41
+                    - C41                   // Mass source from wick
                 );
 
                 add(D[i], 0, 6, 0.0
@@ -608,25 +612,25 @@ int main() {
                 add(D[i], 0, 8, 0.0
 
                     // Source term
-                    - C42
+                    - C42                   // Mass source from wick
                 );
 
                 add(D[i], 0, 9, 0.0
 
                     // Source term
-                    - C43
+                    - C43                   // Mass source from wick
                 );
 
                 add(D[i], 0, 10, 0.0
 
                     // Source term
-                    - C44
+                    - C44                   // Mass source from wick
                 );
 
                 Q[i][0] = 0.0
 
                     // Source term (implicit)
-                    + C45
+                    + C45                   // Mass source from wick
 
                     // Source term (explicit)
                     // + Gamma_xv_iter[i]
@@ -699,7 +703,7 @@ int main() {
                 add(D[i], 1, 4, 0.0
 
                     // Source term
-                    + C41
+                    + C41                   // Mass source from vapor
                 );
 
                 add(D[i], 1, 7, 0.0
@@ -712,19 +716,19 @@ int main() {
                 add(D[i], 1, 8, 0.0
 
                     // Source term
-                    + C42
+                    + C42                   // Mass source from vapor
                 );
 
                 add(D[i], 1, 9, 0.0
 
                     // Source term
-                    + C43
+                    + C43                   // Mass source from vapor
                 );
 
                 add(D[i], 1, 10, 0.0
 
                     // Source term
-                    + C44
+                    + C44                   // Mass source from vapor
                 );
 
 
@@ -743,7 +747,7 @@ int main() {
                         ) / dz
 
                     // Source term (implicit)
-                    - C45
+                    - C45                   // Mass source from vapor
 
                     // Source term (explicit)
                     // - Gamma_xv_iter[i]
@@ -819,7 +823,8 @@ int main() {
                 add(D[i], 2, 4, 0.0
 
                     // Source term
-                    - C51 - C61
+                    - C51                   // Heat source due to heat flux from wick
+                    - C61                   // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 6, 0.0
@@ -845,20 +850,23 @@ int main() {
                     - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Source term
-                    - C52 - C62
+                    - C52                   // Heat source due to heat flux from wick
+                    - C62                   // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 9, 0.0
 
                     // Source term
-                    - C53 - C63
+                    - C53                   // Heat source due to heat flux from wick
+                    - C63                   // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 10, 0.0
 
                     // Source term
-                    - C54 - C64
-                );
+                    - C54                   // Heat source due to heat flux from wick
+                    - C64                   // Heat source due to mass flux from wick
+                );  
 
                 Q[i][2] = 0.0
 
@@ -887,7 +895,8 @@ int main() {
                     + (p_m_iter[i] * alpha_m_old[i]) / dt
 
                     // Source term
-                    + C55 + C65
+                    + C55                   // Heat source due to heat flux from wick
+                    + C65                   // Heat source due to mass flux from wick
                     ;
 
                 add(L[i], 2, 0, 0.0
@@ -987,7 +996,9 @@ int main() {
                 add(D[i], 3, 4, 0.0
 
                     // Source term
-                    - C46 - C56 - C66
+                    - C46                       // Heat source due to heat flux from wall
+                    - C56                       // Heat source due to mass flux from vapor
+                    - C66                       // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 7, 0.0
@@ -1003,7 +1014,9 @@ int main() {
                 add(D[i], 3, 8, 0.0
 
                     // Source term
-                    - C47 - C57 - C67
+                    - C47                       // Heat source due to heat flux from wall
+                    - C57                       // Heat source due to mass flux from vapor 
+                    - C67                       // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 9,
@@ -1019,13 +1032,17 @@ int main() {
                     - (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Source term
-                    - C48 - C58 - C68
+                    - C48                       // Heat source due to heat flux from wall
+                    - C58                       // Heat source due to mass flux from vapor
+                    - C68                       // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 10, 0.0
 
                     // Source term
-                    - C49 - C59 - C69
+                    - C49                       // Heat source due to heat flux from wall
+                    - C59                       // Heat source due to mass flux from vapor 
+                    - C69                       // Heat source due to heat flux from vapor
                 );
 
                 Q[i][3] = 0.0
@@ -1055,7 +1072,9 @@ int main() {
                     + (p_l_iter[i] * alpha_l_old[i]) / dt
 
                     // Source term
-                    + C50 + C60 + C70
+                    + C50                       // Heat source due to heat flux from wall
+                    + C60                       // Heat source due to mass flux from vapor
+                    + C70                       // Heat source due to heat flux from vapor
                     ;
 
                 add(L[i], 3, 1, 0.0
@@ -1136,19 +1155,19 @@ int main() {
                 add(D[i], 4, 4, 0.0
 
                     // Source term
-                    - C71
+                    - C71                       // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 8, 0.0
 
                     // Source term
-                    - C72
+                    - C72                       // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 9, 0.0
 
                     // Source term
-                    - C73
+                    - C73                       // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 10, 0.0
@@ -1160,7 +1179,7 @@ int main() {
                     + (k_w_lf + k_w_rf) / (dz * dz)
 
                     // Source term
-                    - C74
+                    - C74                       // Heat source due to heat flux from wick
                 );
 
                 Q[i][4] = 0.0
@@ -1172,7 +1191,7 @@ int main() {
                     + (rho_w_p * cp_w_p * T_w_old[i]) / dt
 
                     // Source term
-                    + C75
+                    + C75                       // Heat source due to heat flux from wick
                     ;
 
                 add(L[i], 4, 10, 0.0
@@ -1229,6 +1248,7 @@ int main() {
                     - 2 * ((1 - H(v_m_iter[i])) * alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i]) / dz
 
                     // Friction term (central differences)
+                    // WHaTCH ouT THiS TeRM GiVeS SoMe PRoBLeMS
                     // + fm * (rho_m_iter[i] + rho_m_iter[i + 1]) * std::abs(v_m_iter[i]) / (8 * r_v)
                 );
 
@@ -1333,7 +1353,7 @@ int main() {
                 add(D[i], 6, 5, 0.0
 
                     // Pressure term (central differences)
-                    - eps_v * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
+                    // - eps_v * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 6, 7,
@@ -1346,7 +1366,7 @@ int main() {
                     - 2 * eps_v * ((1 - H(v_l_iter[i])) * alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i]) / dz
 
                     // Friction term
-                    + Fl * std::abs(v_l_iter[i])
+                    // + Fl * std::abs(v_l_iter[i])
                 );
 
                 Q[i][6] =
@@ -1411,13 +1431,13 @@ int main() {
                 add(R[i], 6, 5, 0.0
 
                     // Pressure term (central differences)
-                    + eps_v * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
+                    // + eps_v * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
                 );
 
                 add(R[i], 6, 7,
 
                     // Convective term
-                    +2 * eps_v * ((1 - H(v_l_iter[i])) * alpha_l_iter[i + 1] * rho_l_iter[i + 1] * v_l_iter[i + 1]) / dz
+                    + 2 * eps_v * ((1 - H(v_l_iter[i])) * alpha_l_iter[i + 1] * rho_l_iter[i + 1] * v_l_iter[i + 1]) / dz
                 );
 
                 // State mixture equation
@@ -1620,11 +1640,26 @@ int main() {
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
                 L_pic[6] += eps;
 
+                /*
                 // v_l
                 Aold = v_l_iter[i];
                 Anew = X[i][7];
                 denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[7] += eps;
+                */
+
+                // v_l  — norma mista (robusta per v ~ 0)
+                Aold = v_l_iter[i];
+                Anew = X[i][7];
+
+                // scala fisica per la velocità del liquido
+                const double v_abs_tol = 1e-8;        // [m/s] rumore numerico accettabile
+                const double v_scale = 1e-4;        // [m/s] scala fisica minima (regola pratica)
+
+                denom = std::max({ std::abs(Aold), std::abs(Anew), v_scale, v_abs_tol });
+                eps = std::abs(Anew - Aold) / denom;
+
                 L_pic[7] += eps;
 
                 // T_m
@@ -1744,7 +1779,7 @@ int main() {
 
             time_total += dt;       // Advance in time
 
-            const int output_every = 1;
+            const int output_every = 10;
 
             if (n % output_every == 0) {
                 for (int i = 0; i < N; ++i) {
@@ -1778,6 +1813,10 @@ int main() {
 
                     psat_output << p_saturation[i] << " ";
                     tsur_output << T_sur[i] << " ";
+
+					dpcap_output << DPcap[i] << " ";
+
+					q_pp_output << q_pp[i] << " ";
                 }
 
                 time_output << time_total << " ";
@@ -1812,6 +1851,8 @@ int main() {
                 psat_output << "\n";
                 tsur_output << "\n";
 
+				dpcap_output << "\n";
+				q_pp_output << "\n";
 
                 v_velocity_output.flush();
                 v_pressure_output.flush();
@@ -1840,6 +1881,9 @@ int main() {
                 tsur_output.flush();
 
                 time_output.flush();
+
+				dpcap_output.flush();
+				q_pp_output.flush();
             }
         }
         else {
@@ -1891,6 +1935,9 @@ int main() {
     tsur_output.close();
 
     time_output.close();
+
+	dpcap_output.close();
+	q_pp_output.close();
 
     double end = omp_get_wtime();
     printf("Execution time: %.6f s\n", end - start);

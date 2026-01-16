@@ -57,6 +57,8 @@ targets = [
     "heat_source_liquid_vapor_flux.txt",
     "p_saturation.txt",
     "T_sur.txt",
+    "delta_p_capillary.txt",
+    "q_pp.txt"
 ]
 
 
@@ -94,7 +96,9 @@ names = [
     "Heat source vapor→liquid (flux)",
     "Heat source liquid→vapor (flux)",
     "Saturation pressure",
-    "T_sur"
+    "T_sur",
+    "DPcap",
+    "Q to wall"
 ]
 
 
@@ -121,6 +125,8 @@ units = [
     "[W/m³]",              # heat liquid→vapor (flux)
     "[Pa]",                # psat
     "[K]"                  # T_sur
+    "[Pa]",
+    "[W/m3]"
 ]
 
 
@@ -143,7 +149,7 @@ def index_to_time(i):
 # -------------------- Figure --------------------
 fig, ax = plt.subplots(figsize=(11, 6))
 plt.subplots_adjust(left=0.08, bottom=0.25, right=0.58)
-line, = ax.plot([], [], lw=2)
+line, = ax.plot([], [], lw=2, marker='o', markersize=4)
 ax.grid(True)
 ax.set_xlabel("Axial length [m]")
 

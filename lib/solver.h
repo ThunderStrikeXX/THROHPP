@@ -77,6 +77,6 @@ void add(SparseBlock& B, int p, int q, double v);
 // Other utilities
 // ========================
 inline double H(double v) {
-    const double delta = 1e-10;
+    const double delta = 1e-6;
     return 0.5 * (1.0 + std::tanh(v / delta));
 }
