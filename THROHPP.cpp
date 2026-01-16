@@ -73,7 +73,7 @@ int main() {
 
     // Environmental boundary conditions
     const double h_conv = 1;                                                       /// Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const double power = 10000;                                                      /// Power at the evaporator side [W]
+    const double power = 30000;                                                      /// Power at the evaporator side [W]
     const double T_env = 280.0;                                                     /// External environmental temperature [K]
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
@@ -86,7 +86,7 @@ int main() {
 
     // Picard loops parameters	          
     int pic = 0;                                        /// Number of Picard iterations [-]
-    const int max_picard = 30;                         /// Maximum number of Picard iterations per timestep [-]
+    const int max_picard = 10;                         /// Maximum number of Picard iterations per timestep [-]
     std::array<double, B> L_pic;                        /// Picard residuals [-]
     std::array<bool, B> conv_var;                       /// Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   /// Tolerance for the convergence of Picard loop [-]
