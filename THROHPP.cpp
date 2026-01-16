@@ -73,7 +73,7 @@ int main() {
 
     // Environmental boundary conditions
     const double h_conv = 10;                                                       /// Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const double power = 1000;                                                      /// Power at the evaporator side [W]
+    const double power = 100;                                                      /// Power at the evaporator side [W]
     const double T_env = 280.0;                                                     /// External environmental temperature [K]
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
@@ -148,8 +148,8 @@ int main() {
     double h_xv_v;                                                  /// Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
-    const double T_left = 900.0;                        /// First node initialization temperature [K]
-    const double T_right = 900.0;                       /// Last node initialization temperature [K]
+    const double T_left = 800.0;                        /// First node initialization temperature [K]
+    const double T_right = 800.0;                       /// Last node initialization temperature [K]
 
     // Temperatures initialization
     for (int i = 0; i < N; ++i) {
