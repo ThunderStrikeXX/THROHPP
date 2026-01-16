@@ -44,11 +44,11 @@ int main() {
 
     // Evaporation and condensation parameters
     const double eps_s = 1.0;               /// Surface fraction of the wick available for phasic interface [-]
-    const double sigma_e = 0.05;            /// Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.05;            /// Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const double sigma_e = 0.1;            /// Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 0.1;            /// Condensation accomodation coefficient [-]. 1 means optimal condensation
 
     // Geometric parameters
-    const int N = 40;                                                           /// Number of axial nodes [-]
+    const int N = 20;                                                           /// Number of axial nodes [-]
     const double l = 0.982; 			                                        /// Length of the heat pipe [m]
     const double dz = l / N;                                                    /// Axial discretization step [m]
     const double evaporator_length = 0.502;                                     /// Evaporator length [m]
@@ -149,7 +149,7 @@ int main() {
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
     const double T_left = 800.0;                        /// First node initialization temperature [K]
-    const double T_right = 800.0;                       /// Last node initialization temperature [K]
+    const double T_right = 790.0;                       /// Last node initialization temperature [K]
 
     // Temperatures initialization
     for (int i = 0; i < N; ++i) {
@@ -395,6 +395,20 @@ int main() {
                     h_vx_x = liquid_sodium::h(T_sur_iter[i])
                         + (vapor_sodium::h(T_m_iter[i]) - vapor_sodium::h(T_sur_iter[i]));
                 }
+
+                const double theta = 0.5 * (1.0 + std::tanh(Gamma_xv_iter[i] / 1e-3));
+
+                h_xv_v =
+                    theta * vapor_sodium::h(T_sur_iter[i])
+                    + (1.0 - theta) * vapor_sodium::h(T_m_iter[i]);
+
+                h_vx_x =
+                    theta * liquid_sodium::h(T_sur_iter[i])
+                    + (1.0 - theta) * (
+                        liquid_sodium::h(T_sur_iter[i])
+                        + vapor_sodium::h(T_m_iter[i])
+                        - vapor_sodium::h(T_sur_iter[i])
+                        );
 
                 // Omega factor definition (at the moment, not active)
                 double Omega = 1.0;
