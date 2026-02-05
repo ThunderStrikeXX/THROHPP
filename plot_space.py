@@ -16,7 +16,10 @@ def safe_loadtxt(filename, fill_value=-1e9):
         lines = [parse_line(l) for l in f]
     return np.loadtxt(StringIO(''.join(lines)))
 
-root = os.getcwd()
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
+root = script_dir
+
 cases = [d for d in os.listdir(root) if os.path.isdir(d) and "case" in d]
 
 if len(cases) == 0:

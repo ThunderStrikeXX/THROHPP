@@ -73,7 +73,7 @@ int main() {
 
     // Environmental boundary conditions
     const double h_conv = 1;                                                       /// Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const double power = 30000;                                                      /// Power at the evaporator side [W]
+    const double power = 1000;                                                      /// Power at the evaporator side [W]
     const double T_env = 280.0;                                                     /// External environmental temperature [K]
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
@@ -110,8 +110,6 @@ int main() {
     // State variables definition and initialization
     std::vector<double> rho_m(N, 0.01);                 /// Mixture density [kg/m3]
     std::vector<double> rho_l(N, 1000);                 /// Liquid density [kg/m3]
-    std::vector<double> alpha_m(N, 0.90);                /// Mixture volume fraction [-]
-    std::vector<double> alpha_l(N, 0.1);                /// Liquid volume fraction [-]
     std::vector<double> p_m(N);                         /// Mixture pressure [Pa]
     std::vector<double> p_l(N);                         /// Liquid pressure [Pa]
     std::vector<double> v_m(N, 1.0);                  /// Mixture velocity [m/s]
@@ -119,6 +117,15 @@ int main() {
     std::vector<double> T_m(N);                         /// Mixture bulk temperature [K]
     std::vector<double> T_l(N);                         /// Liquid bulk temperature [K]
     std::vector<double> T_w(N);                         /// Wall bulk temperature [K]
+
+    std::vector<double> alpha_m(N), alpha_l(N);
+
+    for (int i = 0; i < N; ++i) {
+        double s = static_cast<double>(i) / (N - 1);   // 0 → 1
+
+        alpha_m[i] = 0.95 - 0.55 * s;   // 0.95 → 0.40
+        alpha_l[i] = 0.05 + 0.55 * s;   // 0.05 → 0.60
+    }
 
     // Secondary useful variables
     std::vector<double> Gamma_xv(N, 0.0);                           /// Exact mass volumetric source [kg/m3s]
@@ -149,7 +156,7 @@ int main() {
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
     const double T_left = 800.0;                        /// First node initialization temperature [K]
-    const double T_right = 790.0;                       /// Last node initialization temperature [K]
+    const double T_right = 800.0;                       /// Last node initialization temperature [K]
 
     // Temperatures initialization
     for (int i = 0; i < N; ++i) {
@@ -376,7 +383,8 @@ int main() {
                 const double Dh_v = 2.0 * r_v;                                              /// Hydraulic diameter of the vapor core [m]
                 const double Re_v = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_v;   /// Reynolds number [-]
                 const double Pr_v = cp_m * mu_v / k_m;                                      /// Prandtl number [-]
-                const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);            /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                // const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);            /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                const double H_xm = (k_x / Dh_v) * (5.0 + 0.66 * std::pow(std::abs(v_l[i]), 0.8));
                 p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                       /// Saturation pressure [Pa]         
                 const double dPsat_dT = vapor_sodium::dP_sat_dT(T_sur_iter[i]);             /// Derivative of the saturation pressure wrt T [Pa/K]   
 
@@ -396,8 +404,7 @@ int main() {
                         + (vapor_sodium::h(T_m_iter[i]) - vapor_sodium::h(T_sur_iter[i]));
                 }
 
-                h_xv_v = vapor_sodium::h(T_m_iter[i]);
-                h_vx_x = liquid_sodium::h(T_sur_iter[i]);
+                const double vaporization_enthalpy = h_xv_v - h_vx_x;
 
                 // Omega factor definition (at the moment, not active)
                 double Omega = 1.0;
@@ -414,12 +421,12 @@ int main() {
                 aGamma[i] = Gamma_xv_iter[i] - bGamma[i] * T_sur_iter[i];
 
                 // Radial model constants
-                const double Ex3 = H_xm + (h_vx_x * r_i * r_i) / (2.0 * r_v) * bGamma[i];
-                const double Ex4 = -k_x + H_xm * r_v + h_vx_x * r_i * r_i / 2.0 * bGamma[i];
-                const double Ex5 = -2.0 * r_v * k_x + H_xm * r_v * r_v + h_vx_x * r_i * r_i / 2.0 * bGamma[i] * r_v;
+                const double Ex3 = H_xm + (vaporization_enthalpy * r_i * r_i) / (2.0 * r_v) * bGamma[i];
+                const double Ex4 = -k_x + H_xm * r_v + vaporization_enthalpy * r_i * r_i / 2.0 * bGamma[i];
+                const double Ex5 = -2.0 * r_v * k_x + H_xm * r_v * r_v + vaporization_enthalpy * r_i * r_i / 2.0 * bGamma[i] * r_v;
                 const double Ex6 = -H_xm;
-                const double Ex7 = (h_vx_x * r_i * r_i) / (2.0 * r_v) * cGamma[i];
-                const double Ex8 = (h_vx_x * r_i * r_i) / (2.0 * r_v) * aGamma[i];
+                const double Ex7 = (vaporization_enthalpy * r_i * r_i) / (2.0 * r_v) * cGamma[i];
+                const double Ex8 = (vaporization_enthalpy * r_i * r_i) / (2.0 * r_v) * aGamma[i];
 
                 const double alpha = 1.0 / (2 * r_o * (Eio1 - r_i) + r_i * r_i - Eio2);
                 const double gamma = r_i * r_i + ((Ex5 - Evi2 * Ex3) * (Evi1 - r_i)) / (Ex4 - Evi1 * Ex3) - Evi2;
@@ -565,7 +572,7 @@ int main() {
                     }
                 }
 
-                DPcap[i] = 0.0;
+                // DPcap[i] = 0.0;
 
                 #pragma endregion
 
@@ -1782,7 +1789,7 @@ int main() {
 
             time_total += dt;       // Advance in time
 
-            const int output_every = 10;
+            const int output_every = 1;
 
             if (n % output_every == 0) {
                 for (int i = 0; i < N; ++i) {
