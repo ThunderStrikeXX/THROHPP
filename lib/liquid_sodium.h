@@ -1,21 +1,11 @@
 #pragma once
 
-/**
- * @brief Provides thermophysical properties for Liquid Sodium (Na).
- *
- * This namespace contains constant data and functions to calculate key
- * temperature-dependent properties of liquid sodium.
- * All functions accept temperature T in Kelvin [K] and return values
- * in standard SI units unless otherwise specified.
- * The function give warnings if the input temperature is below the
- * (constant) solidification temperature.
- */
 namespace liquid_sodium {
 
-    /// Critical temperature [K]
+    // Critical temperature [K]
     constexpr double Tcrit = 2509.46;
 
-    /// Solidification temperature [K]
+    // Solidification temperature [K]
     constexpr double Tsolid = 370.87;
 
     /**
@@ -37,16 +27,6 @@ namespace liquid_sodium {
     }
 
     /**
-    * @brief Specific heat at constant pressure [J/(kg·K)] as a function of temperature
-    *   Vargaftik / Fink & Leibowitz
-    */
-    inline double cp(double T) {
-
-        double dXT = T - 273.15;
-        return 1436.72 - 0.58 * dXT + 4.627e-4 * dXT * dXT;
-    }
-
-    /**
     * @brief Dynamic viscosity [Pa·s] using Shpilrain et al. correlation, valid for 371 K < T < 2500 K
     *   Shpilrain et al
     */
@@ -55,18 +35,25 @@ namespace liquid_sodium {
         return std::exp(-6.4406 - 0.3958 * std::log(T) + 556.835 / T);
     }
 
-    /// Enthalpy of liquid sodium [J/kg] (CODATA correlation)
-    inline double h(double T) {
-        // Numerical safety only
-        if (T < 300.0)  T = 300.0;
-        if (T > 2500.0) T = 2500.0;
+    // From h_l(T) = al + bl * T
+    inline double cp_l_linear() {
 
-        return (
-            -365.77
-            + 1.6582e0 * T
-            - 4.2395e-4 * T * T
-            + 1.4847e-7 * T * T * T
-            + 2992.6 / T
-            ) * 1e3;   // J/kg
+        return 1.256230e3;   // J/(kg·K)
+    }
+
+    inline double h_l_linear(double T) {
+
+        constexpr double al = -2.359582e5;   // J/kg
+        constexpr double bl = 1.256230e3;    // J/(kg·K)
+
+        return al + bl * T;                     // J/kg
+    }
+
+    inline double T_from_h_l_linear(double h) {
+
+        constexpr double al = -2.359582e5;   // J/kg
+        constexpr double bl = 1.256230e3;    // J/(kg·K)
+
+        return (h - al) / bl;                   // K
     }
 }
