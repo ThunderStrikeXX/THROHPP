@@ -78,7 +78,7 @@ int main() {
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-5;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-4;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
     const int tot_iter = 1e8;                           /// Number of timesteps [-]
     double time_total = 0.0;                            /// Total time elapsed [s]
@@ -884,10 +884,6 @@ int main() {
                     + (alpha_m_iter[i] * cv_m_p * T_m_old[i] * rho_m_iter[i]) / dt
                     + (alpha_m_old[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
 
-                    // Temporal term (conservation version)
-                    + 2 * (alpha_m_iter[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt
-                    + (alpha_m_old[i] * cv_m_p * T_m_old[i] * rho_m_old[i]) / dt
-
                     // Convective term
                     + 3 * (
                         + alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])
@@ -1060,10 +1056,6 @@ int main() {
                     + eps_v * (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * rho_l_old[i]) / dt
                     + eps_v * (alpha_l_iter[i] * cp_l_p * T_l_old[i] * rho_l_iter[i]) / dt
                     + eps_v * (alpha_l_old[i] * cp_l_p * T_l_iter[i] * rho_l_iter[i]) / dt
-
-                    // Temporal term (conservative terms)
-                    + 2 * (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * rho_l_iter[i]) / dt
-                    + (alpha_l_old[i] * cp_l_p * T_l_old[i] * rho_l_old[i]) / dt
 
                     // Convective term
                     + 3 * eps_v * (
