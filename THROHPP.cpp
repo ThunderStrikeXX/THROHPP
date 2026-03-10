@@ -322,6 +322,16 @@ int main() {
 
     }; eos_update(rho_m, p_m, T_m);
 
+    std::vector<double> heat_balance_wx(N, 0);
+    std::vector<double> heat_balance_xv(N, 0);
+
+    std::vector<double> C1(N, 0.0), C2(N, 0.0), C3(N, 0.0), C4(N, 0.0), C5(N, 0.0), C6(N, 0.0), C7(N, 0.0), C8(N, 0.0), C9(N, 0.0), C10(N, 0.0), C11(N, 0.0), C12(N, 0.0)
+        , C13(N, 0.0), C14(N, 0.0), C15(N, 0.0), C16(N, 0.0), C17(N, 0.0), C18(N, 0.0), C19(N, 0.0), C20(N, 0.0), C21(N, 0.0), C22(N, 0.0), C23(N, 0.0), C24(N, 0.0), C25(N, 0.0)
+        , C26(N, 0.0), C27(N, 0.0), C28(N, 0.0), C29(N, 0.0), C30(N, 0.0), C31(N, 0.0), C32(N, 0.0), C33(N, 0.0), C34(N, 0.0), C35(N, 0.0), C36(N, 0.0), C37(N, 0.0), C38(N, 0.0)
+        , C39(N, 0.0), C40(N, 0.0), C41(N, 0.0), C42(N, 0.0), C43(N, 0.0), C44(N, 0.0), C45(N, 0.0), C46(N, 0.0), C47(N, 0.0), C48(N, 0.0), C49(N, 0.0), C50(N, 0.0), C51(N, 0.0)
+        , C52(N, 0.0), C53(N, 0.0), C54(N, 0.0), C55(N, 0.0), C56(N, 0.0), C57(N, 0.0), C58(N, 0.0), C59(N, 0.0), C60(N, 0.0), C61(N, 0.0), C62(N, 0.0), C63(N, 0.0), C64(N, 0.0)
+        , C65(N, 0.0), C66(N, 0.0), C67(N, 0.0), C68(N, 0.0), C69(N, 0.0), C70(N, 0.0), C71(N, 0.0), C72(N, 0.0), C73(N, 0.0), C74(N, 0.0), C75(N, 0.0);
+
     #pragma endregion
 
     /// Print number of working threads
@@ -438,109 +448,109 @@ int main() {
                 const double gamma = r_i * r_i + ((Ex5 - Evi2 * Ex3) * (Evi1 - r_i)) / (Ex4 - Evi1 * Ex3) - Evi2;
 
                 // Delta coefficients
-                const double C1 = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex7;
-                const double C2 = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex6;
-                const double C3 = +(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex3 + 1;
-                const double C4 = -1;
-                const double C5 = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * (Ex8 - Ex7 * p_m_iter[i]) + q_pp[i] / k_w * (Eio1 - r_i);
+                C1[i] = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex7;
+                C2[i] = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex6;
+                C3[i] = +(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * Ex3 + 1;
+                C4[i] = -1;
+                C5[i] = -(Evi1 - r_i) / (Ex4 - Evi1 * Ex3) * (Ex8 - Ex7 * p_m_iter[i]) + q_pp[i] / k_w * (Eio1 - r_i);
 
                 // c_x coefficients
-                const double C6 = (2 * k_w * (r_o - r_i) * alpha * C1 + k_x * Ex7 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-                const double C7 = (2 * k_w * (r_o - r_i) * alpha * C2 + k_x * Ex6 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-                const double C8 = (2 * k_w * (r_o - r_i) * alpha * C3 - k_x * Ex3 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-                const double C9 = (2 * k_w * (r_o - r_i) * alpha * C4) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
-                const double C10 = (-q_pp[i] + 2 * k_w * (r_o - r_i) * alpha * C5 + k_x * (Ex8 - p_m_iter[i] * Ex7) / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                C6[i] = (2 * k_w * (r_o - r_i) * alpha * C1[i] + k_x * Ex7 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                C7[i] = (2 * k_w * (r_o - r_i) * alpha * C2[i] + k_x * Ex6 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                C8[i] = (2 * k_w * (r_o - r_i) * alpha * C3[i] - k_x * Ex3 / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                C9[i] = (2 * k_w * (r_o - r_i) * alpha * C4[i]) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
+                C10[i] = (-q_pp[i] + 2 * k_w * (r_o - r_i) * alpha * C5[i] + k_x * (Ex8 - p_m_iter[i] * Ex7) / (Ex4 - Evi1 * Ex3)) / (2 * (r_i - r_o) * k_w * alpha * gamma + k_x * (Ex5 - Evi2 * Ex3) / (Ex4 - Evi1 * Ex3) - 2 * r_i * k_x);
 
                 // c_w coefficients
-                const double C11 = alpha * (C1 + gamma * C6);
-                const double C12 = alpha * (C2 + gamma * C7);
-                const double C13 = alpha * (C3 + gamma * C8);
-                const double C14 = alpha * (C4 + gamma * C9);
-                const double C15 = alpha * (C5 + gamma * C10);
+                C11[i] = alpha * (C1[i] + gamma * C6[i]);
+                C12[i] = alpha * (C2[i] + gamma * C7[i]);
+                C13[i] = alpha * (C3[i] + gamma * C8[i]);
+                C14[i] = alpha * (C4[i] + gamma * C9[i]);
+                C15[i] = alpha * (C5[i] + gamma * C10[i]);
 
                 // b_w coefficients
-                const double C16 = -2 * r_o * C11;
-                const double C17 = -2 * r_o * C12;
-                const double C18 = -2 * r_o * C13;
-                const double C19 = -2 * r_o * C14;
-                const double C20 = -2 * r_o * C15 + q_pp[i] / k_w;
+                C16[i] = -2 * r_o * C11[i];
+                C17[i] = -2 * r_o * C12[i];
+                C18[i] = -2 * r_o * C13[i];
+                C19[i] = -2 * r_o * C14[i];
+                C20[i] = -2 * r_o * C15[i] + q_pp[i] / k_w;
 
                 // a_w coefficients
-                const double C21 = (2 * r_o * Eio1 - Eio2) * C11;
-                const double C22 = (2 * r_o * Eio1 - Eio2) * C12;
-                const double C23 = (2 * r_o * Eio1 - Eio2) * C13;
-                const double C24 = (2 * r_o * Eio1 - Eio2) * C14 + 1;
-                const double C25 = (2 * r_o * Eio1 - Eio2) * C15 - q_pp[i] * Eio1 / k_w;
+                C21[i] = (2 * r_o * Eio1 - Eio2) * C11[i];
+                C22[i] = (2 * r_o * Eio1 - Eio2) * C12[i];
+                C23[i] = (2 * r_o * Eio1 - Eio2) * C13[i];
+                C24[i] = (2 * r_o * Eio1 - Eio2) * C14[i] + 1;
+                C25[i] = (2 * r_o * Eio1 - Eio2) * C15[i] - q_pp[i] * Eio1 / k_w;
 
                 // b_x coefficients
-                const double C26 = (-(Ex5 - Evi2 * Ex3) * C6 + Ex7) / (Ex4 - Evi1 * Ex3);
-                const double C27 = (-(Ex5 - Evi2 * Ex3) * C7 + Ex6) / (Ex4 - Evi1 * Ex3);
-                const double C28 = (-(Ex5 - Evi2 * Ex3) * C8 - Ex3) / (Ex4 - Evi1 * Ex3);
-                const double C29 = (-(Ex5 - Evi2 * Ex3) * C9) / (Ex4 - Evi1 * Ex3);
-                const double C30 = (-(Ex5 - Evi2 * Ex3) * C10 + Ex8 - p_m_iter[i] * Ex7) / (Ex4 - Evi1 * Ex3);
+                C26[i] = (-(Ex5 - Evi2 * Ex3) * C6[i] + Ex7) / (Ex4 - Evi1 * Ex3);
+                C27[i] = (-(Ex5 - Evi2 * Ex3) * C7[i] + Ex6) / (Ex4 - Evi1 * Ex3);
+                C28[i] = (-(Ex5 - Evi2 * Ex3) * C8[i] - Ex3) / (Ex4 - Evi1 * Ex3);
+                C29[i] = (-(Ex5 - Evi2 * Ex3) * C9[i]) / (Ex4 - Evi1 * Ex3);
+                C30[i] = (-(Ex5 - Evi2 * Ex3) * C10[i] + Ex8 - p_m_iter[i] * Ex7) / (Ex4 - Evi1 * Ex3);
 
                 // a_x coefficients
-                const double C31 = -Evi1 * C26 - Evi2 * C6;
-                const double C32 = -Evi1 * C27 - Evi2 * C7;
-                const double C33 = -Evi1 * C28 - Evi2 * C8 + 1;
-                const double C34 = -Evi1 * C29 - Evi2 * C9;
-                const double C35 = -Evi1 * C30 - Evi2 * C10;
+                C31[i] = -Evi1 * C26[i] - Evi2 * C6[i];
+                C32[i] = -Evi1 * C27[i] - Evi2 * C7[i];
+                C33[i] = -Evi1 * C28[i] - Evi2 * C8[i] + 1;
+                C34[i] = -Evi1 * C29[i] - Evi2 * C9[i];
+                C35[i] = -Evi1 * C30[i] - Evi2 * C10[i];
 
                 // T_sur coefficients
-                const double C36 = C31 + r_v * C26 + r_v * r_v * C6;
-                const double C37 = C32 + r_v * C27 + r_v * r_v * C7;
-                const double C38 = C33 + r_v * C28 + r_v * r_v * C8;
-                const double C39 = C34 + r_v * C29 + r_v * r_v * C9;
-                const double C40 = C35 + r_v * C30 + r_v * r_v * C10;
+                C36[i] = C31[i] + r_v * C26[i] + r_v * r_v * C6[i];
+                C37[i] = C32[i] + r_v * C27[i] + r_v * r_v * C7[i];
+                C38[i] = C33[i] + r_v * C28[i] + r_v * r_v * C8[i];
+                C39[i] = C34[i] + r_v * C29[i] + r_v * r_v * C9[i];
+                C40[i] = C35[i] + r_v * C30[i] + r_v * r_v * C10[i];
 
                 // Mass source coefficients
-                const double C41 = bGamma[i] * C36 + cGamma[i];
-                const double C42 = bGamma[i] * C37;
-                const double C43 = bGamma[i] * C38;
-                const double C44 = bGamma[i] * C39;
-                const double C45 = bGamma[i] * C40 - cGamma[i] * p_m_iter[i] + aGamma[i];
+                C41[i] = bGamma[i] * C36[i] + cGamma[i];
+                C42[i] = bGamma[i] * C37[i];
+                C43[i] = bGamma[i] * C38[i];
+                C44[i] = bGamma[i] * C39[i];
+                C45[i] = bGamma[i] * C40[i] - cGamma[i] * p_m_iter[i] + aGamma[i];
 
                 // Heat source from mixture to liquid due to heat flux coefficients
-                const double C46 = -2 * k_x * r_v / (r_i * r_i) * (C26 + 2 * r_v * C6);
-                const double C47 = -2 * k_x * r_v / (r_i * r_i) * (C27 + 2 * r_v * C7);
-                const double C48 = -2 * k_x * r_v / (r_i * r_i) * (C28 + 2 * r_v * C8);
-                const double C49 = -2 * k_x * r_v / (r_i * r_i) * (C29 + 2 * r_v * C9);
-                const double C50 = -2 * k_x * r_v / (r_i * r_i) * (C30 + 2 * r_v * C10);
+                C46[i] = -2 * k_x * r_v / (r_i * r_i) * (C26[i] + 2 * r_v * C6[i]);
+                C47[i] = -2 * k_x * r_v / (r_i * r_i) * (C27[i] + 2 * r_v * C7[i]);
+                C48[i] = -2 * k_x * r_v / (r_i * r_i) * (C28[i] + 2 * r_v * C8[i]);
+                C49[i] = -2 * k_x * r_v / (r_i * r_i) * (C29[i] + 2 * r_v * C9[i]);
+                C50[i] = -2 * k_x * r_v / (r_i * r_i) * (C30[i] + 2 * r_v * C10[i]);
 
                 // Heat source from liquid to mixture due to heat flux coefficients
-                const double C51 = 2 * H_xm * r_v / (r_i * r_i) * (C31 + C26 * r_v + C6 * r_v * r_v);
-                const double C52 = 2 * H_xm * r_v / (r_i * r_i) * (C32 + C27 * r_v + C7 * r_v * r_v - 1);
-                const double C53 = 2 * H_xm * r_v / (r_i * r_i) * (C33 + C28 * r_v + C8 * r_v * r_v);
-                const double C54 = 2 * H_xm * r_v / (r_i * r_i) * (C34 + C29 * r_v + C9 * r_v * r_v);
-                const double C55 = 2 * H_xm * r_v / (r_i * r_i) * (C35 + C30 * r_v + C10 * r_v * r_v);
+                C51[i] = 2 * H_xm * r_v / (r_i * r_i) * (C31[i] + C26[i] * r_v + C6[i] * r_v * r_v);
+                C52[i] = 2 * H_xm * r_v / (r_i * r_i) * (C32[i] + C27[i] * r_v + C7[i] * r_v * r_v - 1);
+                C53[i] = 2 * H_xm * r_v / (r_i * r_i) * (C33[i] + C28[i] * r_v + C8[i] * r_v * r_v);
+                C54[i] = 2 * H_xm * r_v / (r_i * r_i) * (C34[i] + C29[i] * r_v + C9[i] * r_v * r_v);
+                C55[i] = 2 * H_xm * r_v / (r_i * r_i) * (C35[i] + C30[i] * r_v + C10[i] * r_v * r_v);
 
                 // Heat source from mixture to liquid due to phase change coefficients
-                const double C56 = -h_vx_x * C41;
-                const double C57 = -h_vx_x * C42;
-                const double C58 = -h_vx_x * C43;
-                const double C59 = -h_vx_x * C44;
-                const double C60 = -h_vx_x * C45;
+                C56[i] = -h_vx_x * C41[i];
+                C57[i] = -h_vx_x * C42[i];
+                C58[i] = -h_vx_x * C43[i];
+                C59[i] = -h_vx_x * C44[i];
+                C60[i] = -h_vx_x * C45[i];
 
                 // Heat source from liquid to mixture due to phase change coefficients
-                const double C61 = h_xv_v * C41;
-                const double C62 = h_xv_v * C42;
-                const double C63 = h_xv_v * C43;
-                const double C64 = h_xv_v * C44;
-                const double C65 = h_xv_v * C45;
+                C61[i] = h_xv_v * C41[i];
+                C62[i] = h_xv_v * C42[i];
+                C63[i] = h_xv_v * C43[i];
+                C64[i] = h_xv_v * C44[i];
+                C65[i] = h_xv_v * C45[i];
 
                 // Heat source from wall to liquid due to heat flux coefficients
-                const double C66 = 2 * k_w / r_i * (C16 + 2 * r_i * C11);
-                const double C67 = 2 * k_w / r_i * (C17 + 2 * r_i * C12);
-                const double C68 = 2 * k_w / r_i * (C18 + 2 * r_i * C13);
-                const double C69 = 2 * k_w / r_i * (C19 + 2 * r_i * C14);
-                const double C70 = 2 * k_w / r_i * (C20 + 2 * r_i * C15);
+                C66[i] = 2 * k_w / r_i * (C16[i] + 2 * r_i * C11[i]);
+                C67[i] = 2 * k_w / r_i * (C17[i] + 2 * r_i * C12[i]);
+                C68[i] = 2 * k_w / r_i * (C18[i] + 2 * r_i * C13[i]);
+                C69[i] = 2 * k_w / r_i * (C19[i] + 2 * r_i * C14[i]);
+                C70[i] = 2 * k_w / r_i * (C20[i] + 2 * r_i * C15[i]);
 
                 // Heat source from liquid to wall due to heat flux coefficients
-                const double C71 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C16 + 2 * r_i * C11);
-                const double C72 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C17 + 2 * r_i * C12);
-                const double C73 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C18 + 2 * r_i * C13);
-                const double C74 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C19 + 2 * r_i * C14);
-                const double C75 = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C20 + 2 * r_i * C15);
+                C71[i] = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C16[i] + 2 * r_i * C11[i]);
+                C72[i] = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C17[i] + 2 * r_i * C12[i]);
+                C73[i] = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C18[i] + 2 * r_i * C13[i]);
+                C74[i] = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C19[i] + 2 * r_i * C14[i]);
+                C75[i] = -2 * k_w * r_i / (r_o * r_o - r_i * r_i) * (C20[i] + 2 * r_i * C15[i]);
 
                 // Update heat fluxes at the interfaces
                 if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;       /// Evaporator imposed heat flux [W/m2]
@@ -613,7 +623,7 @@ int main() {
                 add(D[i], 0, 4, 0.0
 
                     // Source term
-                    - C41                   // Mass source from wick
+                    - C41[i]                  // Mass source from wick
                 );
 
                 add(D[i], 0, 6, 0.0
@@ -626,25 +636,25 @@ int main() {
                 add(D[i], 0, 8, 0.0
 
                     // Source term
-                    - C42                   // Mass source from wick
+                    - C42[i]                   // Mass source from wick
                 );
 
                 add(D[i], 0, 9, 0.0
 
                     // Source term
-                    - C43                   // Mass source from wick
+                    - C43[i]                   // Mass source from wick
                 );
 
                 add(D[i], 0, 10, 0.0
 
                     // Source term
-                    - C44                   // Mass source from wick
+                    - C44[i]                  // Mass source from wick
                 );
 
                 Q[i][0] = 0.0
 
                     // Source term (implicit)
-                    + C45                   // Mass source from wick
+                    + C45[i]                  // Mass source from wick
 
                     // Temporal term
                     + (rho_m_iter[i] * alpha_m_old[i]) / dt
@@ -715,7 +725,7 @@ int main() {
                 add(D[i], 1, 4, 0.0
 
                     // Source term
-                    + C41                   // Mass source from vapor
+                    + C41[i]                 // Mass source from vapor
                 );
 
                 add(D[i], 1, 7, 0.0
@@ -728,19 +738,19 @@ int main() {
                 add(D[i], 1, 8, 0.0
 
                     // Source term
-                    + C42                   // Mass source from vapor
+                    + C42[i]                   // Mass source from vapor
                 );
 
                 add(D[i], 1, 9, 0.0
 
                     // Source term
-                    + C43                   // Mass source from vapor
+                    + C43[i]                  // Mass source from vapor
                 );
 
                 add(D[i], 1, 10, 0.0
 
                     // Source term
-                    + C44                   // Mass source from vapor
+                    + C44[i]                   // Mass source from vapor
                 );
 
 
@@ -759,7 +769,7 @@ int main() {
                         ) / dz
 
                     // Source term (implicit)
-                    - C45                   // Mass source from vapor
+                    - C45[i]                // Mass source from vapor
                     ;
 
                 add(L[i], 1, 1, 0.0
@@ -832,8 +842,8 @@ int main() {
                 add(D[i], 2, 4, 0.0
 
                     // Source term
-                    - C51                   // Heat source due to heat flux from wick
-                    - C61                   // Heat source due to mass flux from wick
+                    - C51[i]                // Heat source due to heat flux from wick
+                    - C61[i]                  // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 6, 0.0
@@ -859,22 +869,22 @@ int main() {
                     - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Source term
-                    - C52                   // Heat source due to heat flux from wick
-                    - C62                   // Heat source due to mass flux from wick
+                    - C52[i]                  // Heat source due to heat flux from wick
+                    - C62[i]                  // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 9, 0.0
 
                     // Source term
-                    - C53                   // Heat source due to heat flux from wick
-                    - C63                   // Heat source due to mass flux from wick
+                    - C53[i]                   // Heat source due to heat flux from wick
+                    - C63[i]                  // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 10, 0.0
 
                     // Source term
-                    - C54                   // Heat source due to heat flux from wick
-                    - C64                   // Heat source due to mass flux from wick
+                    - C54[i]                 // Heat source due to heat flux from wick
+                    - C64[i]                 // Heat source due to mass flux from wick
                 );  
 
                 Q[i][2] = 0.0
@@ -900,8 +910,8 @@ int main() {
                     + (p_m_iter[i] * alpha_m_old[i]) / dt
 
                     // Source term
-                    + C55                   // Heat source due to heat flux from wick
-                    + C65                   // Heat source due to mass flux from wick
+                    + C55[i]                  // Heat source due to heat flux from wick
+                    + C65[i]                  // Heat source due to mass flux from wick
                     ;
 
                 add(L[i], 2, 0, 0.0
@@ -1001,9 +1011,9 @@ int main() {
                 add(D[i], 3, 4, 0.0
 
                     // Source term
-                    - C46                       // Heat source due to heat flux from wall
-                    - C56                       // Heat source due to mass flux from vapor
-                    - C66                       // Heat source due to heat flux from vapor
+                    - C46[i]                      // Heat source due to heat flux from wall
+                    - C56[i]                      // Heat source due to mass flux from vapor
+                    - C66[i]                      // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 7, 0.0
@@ -1019,9 +1029,9 @@ int main() {
                 add(D[i], 3, 8, 0.0
 
                     // Source term
-                    - C47                       // Heat source due to heat flux from wall
-                    - C57                       // Heat source due to mass flux from vapor 
-                    - C67                       // Heat source due to heat flux from vapor
+                    - C47[i]                      // Heat source due to heat flux from wall
+                    - C57[i]                      // Heat source due to mass flux from vapor 
+                    - C67[i]                      // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 9, 0.0
@@ -1037,17 +1047,17 @@ int main() {
                     - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Source term
-                    - C48                       // Heat source due to heat flux from wall
-                    - C58                       // Heat source due to mass flux from vapor
-                    - C68                       // Heat source due to heat flux from vapor
+                    - C48[i]                      // Heat source due to heat flux from wall
+                    - C58[i]                       // Heat source due to mass flux from vapor
+                    - C68[i]                      // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 10, 0.0
 
                     // Source term
-                    - C49                       // Heat source due to heat flux from wall
-                    - C59                       // Heat source due to mass flux from vapor 
-                    - C69                       // Heat source due to heat flux from vapor
+                    - C49[i]                      // Heat source due to heat flux from wall
+                    - C59[i]                      // Heat source due to mass flux from vapor 
+                    - C69[i]                     // Heat source due to heat flux from vapor
                 );
 
                 Q[i][3] = 0.0
@@ -1073,9 +1083,9 @@ int main() {
                     + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
 
                     // Source term
-                    + C50                       // Heat source due to heat flux from wall
-                    + C60                       // Heat source due to mass flux from vapor
-                    + C70                       // Heat source due to heat flux from vapor
+                    + C50[i]                      // Heat source due to heat flux from wall
+                    + C60[i]                      // Heat source due to mass flux from vapor
+                    + C70[i]                      // Heat source due to heat flux from vapor
                     ;
 
                 add(L[i], 3, 1, 0.0
@@ -1156,19 +1166,19 @@ int main() {
                 add(D[i], 4, 4, 0.0
 
                     // Source term
-                    - C71                       // Heat source due to heat flux from wick
+                    - C71[i]                      // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 8, 0.0
 
                     // Source term
-                    - C72                       // Heat source due to heat flux from wick
+                    - C72[i]                      // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 9, 0.0
 
                     // Source term
-                    - C73                       // Heat source due to heat flux from wick
+                    - C73[i]                      // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 10, 0.0
@@ -1180,7 +1190,7 @@ int main() {
                     + (k_w_lf + k_w_rf) / (dz * dz)
 
                     // Source term
-                    - C74                       // Heat source due to heat flux from wick
+                    - C74[i]                      // Heat source due to heat flux from wick
                 );
 
                 Q[i][4] = 0.0
@@ -1192,7 +1202,7 @@ int main() {
                     + (rho_w_p * cp_w_p * T_w_old[i]) / dt
 
                     // Source term
-                    + C75                       // Heat source due to heat flux from wick
+                    + C75[i]                      // Heat source due to heat flux from wick
                     ;
 
                 add(L[i], 4, 10, 0.0
@@ -1457,27 +1467,6 @@ int main() {
 
                 // Densification of the D block for debug purposes
                 // DenseBlock D_dense = to_dense(D[i]);
-
-                // Secondary quantities evaluated at the k + 1 iteration using by k iteration quantities
-
-                heat_source_wall_liquid_flux[i] = C66 * p_m_iter[i] + C67 * T_m_iter[i] + C68 * T_l_iter[i] + C69 * T_w_iter[i] + C70;
-                heat_source_liquid_wall_flux[i] = C71 * p_m_iter[i] + C72 * T_m_iter[i] + C73 * T_l_iter[i] + C74 * T_w_iter[i] + C75;
-
-                heat_source_vapor_liquid_phase[i] = C56 * p_m_iter[i] + C57 * T_m_iter[i] + C58 * T_l_iter[i] + C59 * T_w_iter[i] + C60;
-                heat_source_liquid_vapor_phase[i] = C61 * p_m_iter[i] + C62 * T_m_iter[i] + C63 * T_l_iter[i] + C64 * T_w_iter[i] + C65;
-
-                heat_source_vapor_liquid_flux[i] = C46 * p_m_iter[i] + C47 * T_m_iter[i] + C48 * T_l_iter[i] + C49 * T_w_iter[i] + C50;
-                heat_source_liquid_vapor_flux[i] = C51 * p_m_iter[i] + C52 * T_m_iter[i] + C53 * T_l_iter[i] + C54 * T_w_iter[i] + C55;
-
-                T_sur[i] = C36 * p_m_iter[i] + C37 * T_m_iter[i] + C38 * T_l_iter[i] + C39 * T_w_iter[i] + C40;
-
-                phi_x_v[i] = beta * (sigma_e * p_saturation[i] - sigma_c * Omega * p_m_iter[i]);
-                Gamma_xv[i] = 2 * r_v * eps_s / (r_i * r_i) * phi_x_v[i];
-                Gamma_xv_lin[i] = C41 * p_m_iter[i] + C42 * T_m_iter[i] + C43 * T_l_iter[i] + C44 * T_w_iter[i] + C45;
-
-                energy_wall[i] = rho_w_p * cp_w_p * T_w_iter[i] * V_wall;
-                energy_liquid[i] = alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * V_liquid;
-                energy_vapor[i] = alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * V_vapor;
             }
 
             // First node boundary conditions
@@ -1691,40 +1680,42 @@ int main() {
 
             if (conv_all) {
 
-                E_wall_old = E_wall_new;
-                E_liquid_old = E_liquid_new;
-                E_vapor_old = E_vapor_new;
-                E_tot_old = E_tot_new;
+                // Check balances for each node at the interfaces
+                for (int i = 1; i < N - 1; ++i) {
 
-                E_tot_new = 0.0;
+                    // Heat exchange balance liquid wall
+                    heat_source_wall_liquid_flux[i] = C66[i] * p_m_iter[i] + C67[i] * T_m_iter[i] + C68[i] * T_l_iter[i] + C69[i] * T_w_iter[i] + C70[i];
+                    heat_source_liquid_wall_flux[i] = C71[i] * p_m_iter[i] + C72[i] * T_m_iter[i] + C73[i] * T_l_iter[i] + C74[i] * T_w_iter[i] + C75[i];
 
-                energy_balance = 0.0;
+                    heat_source_wall_liquid_flux[i] *= r_i / 2;
+                    heat_source_liquid_wall_flux[i] *= ((r_o * r_o - r_i * r_i) / (2 * r_i));
 
-                mass_tot = 0.0;
+                    heat_balance_wx[i] = heat_source_wall_liquid_flux[i] + heat_source_liquid_wall_flux[i];
+                   
 
-                for (int i = 0; i < N; ++i) {
 
-                    E_wall_new = energy_wall[i];
-                    E_liquid_new = energy_liquid[i];
-                    E_vapor_new = energy_vapor[i];
 
-                    E_tot_new += E_wall_new;
-                    E_tot_new += E_liquid_new;
-                    E_tot_new += E_vapor_new;
+                    heat_source_vapor_liquid_phase[i] = C56[i] * p_m_iter[i] + C57[i] * T_m_iter[i] + C58[i] * T_l_iter[i] + C59[i] * T_w_iter[i] + C60[i];
+                    heat_source_liquid_vapor_phase[i] = C61[i] * p_m_iter[i] + C62[i] * T_m_iter[i] + C63[i] * T_l_iter[i] + C64[i] * T_w_iter[i] + C65[i];
 
-                    energy_balance += dt * lateral_surface * q_pp[i];
+                    heat_source_vapor_liquid_flux[i] = C46[i] * p_m_iter[i] + C47[i] * T_m_iter[i] + C48[i] * T_l_iter[i] + C49[i] * T_w_iter[i] + C50[i];
+                    heat_source_liquid_vapor_flux[i] = C51[i] * p_m_iter[i] + C52[i] * T_m_iter[i] + C53[i] * T_l_iter[i] + C54[i] * T_w_iter[i] + C55[i];
 
-                    mass_tot += Gamma_xv[i];                                // Should be zero at steady-state
+                    T_sur[i] = C36[i] * p_m_iter[i] + C37[i] * T_m_iter[i] + C38[i] * T_l_iter[i] + C39[i] * T_w_iter[i] + C40[i];
+
                 }
 
-                energy_diff = (E_tot_new - E_tot_old) - energy_balance;     // Should be zero at steady-state
+                /*
+                phi_x_v[i] = beta * (sigma_e * p_saturation[i] - sigma_c * 
+                    * p_m_iter[i]);
+                Gamma_xv[i] = 2 * r_v * eps_s / (r_i * r_i) * phi_x_v[i];
+                Gamma_xv_lin[i] = C41[i] * p_m_iter[i] + C42[i] * T_m_iter[i] + C43[i] * T_l_iter[i] + C44[i] * T_w_iter[i] + C45[i];
 
-                double S_wl = 0, S_vl = 0, S_pc = 0;
-                for (int i = 0; i < N; ++i) {
-                    S_wl += heat_source_wall_liquid_flux[i] + heat_source_liquid_wall_flux[i];
-                    S_vl += heat_source_vapor_liquid_flux[i] + heat_source_liquid_vapor_flux[i];
-                    S_pc += heat_source_vapor_liquid_phase[i] + heat_source_liquid_vapor_phase[i];
-                }
+                energy_wall[i] = rho_w_p * cp_w_p * T_w_iter[i] * V_wall;
+                energy_liquid[i] = alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * V_liquid;
+                energy_vapor[i] = alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * V_vapor;
+
+                */
 
                 halves = 0;             // Reset halves if Picard converged
                 break;                  // Picard converged, so break the loops
