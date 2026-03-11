@@ -78,7 +78,7 @@ int main() {
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-6;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-3;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
     const int tot_iter = 1e8;                           /// Number of timesteps [-]
     double time_total = 0.0;                            /// Total time elapsed [s]
@@ -877,7 +877,7 @@ int main() {
                     - (rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    // + p_m_iter[i] * (v_m_iter[i] - v_m_iter[i - 1]) / (2 * dz)
+                    + p_m_iter[i] * (v_m_iter[i] - v_m_iter[i - 1]) / (2 * dz)
 
                     // Pressure II term
                     + p_m_iter[i] / dt
@@ -897,7 +897,7 @@ int main() {
                     + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
+                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 2, 8, 0.0
@@ -947,8 +947,8 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] / (2 * dz)
-                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i - 1] / (2 * dz)
+                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] / (2 * dz)
+                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i - 1] / (2 * dz)
 
                     // Pressure II term
                     + (p_m_iter[i] * alpha_m_old[i]) / dt
@@ -970,7 +970,7 @@ int main() {
                     - (rho_m_iter[i - 1] * cv_m_l * T_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
 
                     // Pressure I term
-                    // - p_m_iter[i] * (v_m_iter[i - 1]) / (2 * dz)
+                    - p_m_iter[i] * (v_m_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 2, 6, 0.0
@@ -980,7 +980,7 @@ int main() {
                     - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
+                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 2, 8, 0.0
@@ -1004,7 +1004,7 @@ int main() {
                     + (rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    // + p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
+                    + p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
                 );
 
                 add(R[i], 2, 8, 0.0
@@ -1046,10 +1046,10 @@ int main() {
                     - eps_v * (rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    // + eps_v * p_l_iter[i] * (v_l_iter[i] - v_l_iter[i - 1]) / (2 * dz)
+                    + eps_v * p_l_iter[i] * (v_l_iter[i] - v_l_iter[i - 1]) / (2 * dz)
 
                     // Pressure II term
-                    // + eps_v * p_l_iter[i] / dt
+                    + eps_v * p_l_iter[i] / dt
                 );
 
                 add(D[i], 3, 4, 0.0
@@ -1067,7 +1067,7 @@ int main() {
                     + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
-                    // + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
+                    + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 3, 8, 0.0
@@ -1120,11 +1120,11 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    // + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (2 * dz)
-                    // - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) * v_l_iter[i - 1] / (2 * dz)
+                    + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (2 * dz)
+                    - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) * v_l_iter[i - 1] / (2 * dz)
 
                     // Pressure II term
-                    // + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
+                    + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
 
                     // Source term
                     // + C45[i]                      // Heat source due to heat flux from wall
@@ -1144,7 +1144,7 @@ int main() {
                     - eps_v * (rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
 
                     // Pressure I term
-                    // - eps_v * p_l_iter[i] * (v_l_iter[i - 1]) / (2 * dz)
+                    - eps_v * p_l_iter[i] * (v_l_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 3, 7, 0.0
@@ -1154,7 +1154,7 @@ int main() {
                     - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    // - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) / (2 * dz)
+                    - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 3, 9, 0.0
@@ -1178,7 +1178,7 @@ int main() {
                     + eps_v * (rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
-                    // + eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
+                    + eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
                 );
 
                 add(R[i], 3, 9, 0.0
