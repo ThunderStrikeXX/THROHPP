@@ -121,10 +121,9 @@ int main() {
     std::vector<double> alpha_m(N), alpha_l(N);
 
     for (int i = 0; i < N; ++i) {
-        double s = static_cast<double>(i) / (N - 1);   // 0 → 1
-
-        alpha_m[i] = 0.95 - 0.55 * s;   // 0.95 → 0.40
-        alpha_l[i] = 0.05 + 0.55 * s;   // 0.05 → 0.60
+        double s = static_cast<double>(i) / (N - 1);
+        alpha_m[i] = 0.95 - 0.35 * s;   // 0.95 → 0.60
+        alpha_l[i] = 1.0 - alpha_m[i];  // 0.05 → 0.40
     }
 
     // Secondary useful variables
@@ -381,6 +380,8 @@ int main() {
     std::vector<double> heat_balance_wall(N, 0.0);
     std::vector<double> heat_balance_wick(N, 0.0);
     std::vector<double> heat_balance_vapor(N, 0.0);
+
+    std::vector<double> pressure_work_m(N, 0.0);
 
     #pragma endregion
 
@@ -879,7 +880,7 @@ int main() {
                     // + p_m_iter[i] * (v_m_iter[i] - v_m_iter[i - 1]) / (2 * dz)
 
                     // Pressure II term
-                    // + p_m_iter[i] / dt
+                    + p_m_iter[i] / dt
                 );
 
                 add(D[i], 2, 4, 0.0
@@ -950,7 +951,7 @@ int main() {
                     // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i - 1] / (2 * dz)
 
                     // Pressure II term
-                    // + (p_m_iter[i] * alpha_m_old[i]) / dt
+                    + (p_m_iter[i] * alpha_m_old[i]) / dt
 
                     // Source term
                     // + C50[i]                  // Heat source due to heat flux from wick
@@ -1790,6 +1791,10 @@ int main() {
                 heat_balance_wall[i] = q_pp[i] * (2 * M_PI * r_o * dz) + heat_source_liquid_wall_flux[i] * M_PI * (r_o * r_o - r_i * r_i);
                 heat_balance_wick[i] = (heat_source_vapor_liquid_phase[i] + heat_source_vapor_liquid_flux[i] + heat_source_wall_liquid_flux[i]) * M_PI * r_i * r_i;
                 heat_balance_vapor[i] = (heat_source_liquid_vapor_phase[i] + heat_source_liquid_vapor_flux[i]) * M_PI * r_i * r_i;
+
+                // Check mixture pressure work
+
+                pressure_work_m[i] = -p_m_iter[i] * (alpha_m_iter[i] - alpha_m_old[i]) / dt;
 
                 // Update heat fluxes at the interfaces
                 if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;       /// Evaporator imposed heat flux [W/m2]
