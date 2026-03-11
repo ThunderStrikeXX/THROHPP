@@ -378,6 +378,10 @@ int main() {
     std::vector<double> convection_err(N, 0.0);
     std::vector<double> phase_change_err(N, 0.0);
 
+    std::vector<double> heat_balance_wall(N, 0.0);
+    std::vector<double> heat_balance_wick(N, 0.0);
+    std::vector<double> heat_balance_vapor(N, 0.0);
+
     #pragma endregion
 
     /// Print number of working threads
@@ -415,8 +419,6 @@ int main() {
             T_w_iter = T_w;
 
             T_sur_iter = T_sur;
-            phi_x_v_iter = phi_x_v;
-            // Gamma_xv_iter = Gamma_xv;
 
             v_m_iter[0] = 0.0;   // BC ingresso
             v_m_iter[N] = 0.0;   // BC uscita
@@ -1689,19 +1691,21 @@ int main() {
             for (int k = 0; k < B; ++k)
                 L_pic[k] /= N;
 
+            double alpha = 0.01;
+
             // Update vectors from X
             for (int i = 0; i < N; ++i) {
-                rho_m[i] = X[i][0];
-                rho_l[i] = X[i][1];
-                alpha_m[i] = X[i][2];
-                alpha_l[i] = X[i][3];
-                p_m[i] = X[i][4];
-                p_l[i] = X[i][5];
-                v_m[i] = X[i][6];
-                v_l[i] = X[i][7];
-                T_m[i] = X[i][8];
-                T_l[i] = X[i][9];
-                T_w[i] = X[i][10];
+                rho_m[i] += alpha * X[i][0];
+                rho_l[i] += alpha * X[i][1];
+                alpha_m[i] += alpha * X[i][2];
+                alpha_l[i] += alpha * X[i][3];
+                p_m[i] += alpha * X[i][4];
+                p_l[i] += alpha * X[i][5];
+                v_m[i] += alpha * X[i][6];
+                v_l[i] += alpha * X[i][7];
+                T_m[i] += alpha * X[i][8];
+                T_l[i] += alpha * X[i][9];
+                T_w[i] += alpha * X[i][10];
 
                 // Check parabolic profiles
                 c_w[i] = C1[i] * p_m[i] + C2[i] * T_m[i] + C3[i] * T_l[i] + C4[i] * T_w[i] + C5[i];
@@ -1735,10 +1739,7 @@ int main() {
                 heat_source_wall_liquid_flux[i] = C61[i] * p_m[i] + C62[i] * T_m[i] + C63[i] * T_l[i] + C64[i] * T_w[i] + C65[i];
                 heat_source_liquid_wall_flux[i] = C66[i] * p_m[i] + C67[i] * T_m[i] + C68[i] * T_l[i] + C69[i] * T_w[i] + C70[i];
 
-                heat_source_wall_liquid_flux[i] *= r_i / 2;
-                heat_source_liquid_wall_flux[i] *= ((r_o * r_o - r_i * r_i) / (2 * r_i));
-
-                heat_balance_wx[i] = heat_source_wall_liquid_flux[i] + heat_source_liquid_wall_flux[i];
+                heat_balance_wx[i] = heat_source_wall_liquid_flux[i] * (r_i / 2) + heat_source_liquid_wall_flux[i] * ((r_o * r_o - r_i * r_i) / (2 * r_i));
 
                 // Check heat exchange balance liquid vapor
                 heat_conduction_flux[i] = k_x[i] * (
@@ -1786,6 +1787,10 @@ int main() {
                     + heat_source_liquid_vapor_phase[i] 
                     + heat_source_vapor_liquid_phase[i];
 
+                heat_balance_wall[i] = q_pp[i] * (2 * M_PI * r_o * dz) + heat_source_liquid_wall_flux[i] * M_PI * (r_o * r_o - r_i * r_i);
+                heat_balance_wick[i] = (heat_source_vapor_liquid_phase[i] + heat_source_vapor_liquid_flux[i] + heat_source_wall_liquid_flux[i]) * M_PI * r_i * r_i;
+                heat_balance_vapor[i] = (heat_source_liquid_vapor_phase[i] + heat_source_liquid_vapor_flux[i]) * M_PI * r_i * r_i;
+
                 // Update heat fluxes at the interfaces
                 if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;       /// Evaporator imposed heat flux [W/m2]
                 else if (i >= (N - condenser_nodes)) {
@@ -1797,7 +1802,6 @@ int main() {
 
                     q_pp[i] = -(conv + irr);                                /// Heat flux at the outer wall [W/m2] (positive if to the wall) 
                 }
-           
             }
 
             // Check if variable converged
@@ -1819,20 +1823,17 @@ int main() {
         // Picard converged or max iterations reached
         if (pic != max_picard) {
 
-            // Update n values (old = new) and update total time
-            for (int i = 0; i < N; ++i) {
-                rho_m_old[i] = X[i][0];
-                rho_l_old[i] = X[i][1];
-                alpha_m_old[i] = X[i][2];
-                alpha_l_old[i] = X[i][3];
-                p_m_old[i] = X[i][4];
-                p_l_old[i] = X[i][5];
-                v_m_old[i] = X[i][6];
-                v_l_old[i] = X[i][7];
-                T_m_old[i] = X[i][8];
-                T_l_old[i] = X[i][9];
-                T_w_old[i] = X[i][10];
-            }
+            rho_m_old = rho_m;
+            rho_l_old = rho_l;
+            alpha_m_old = alpha_m;
+            alpha_l_old = alpha_l;
+            p_m_old = p_m;
+            p_l_old = p_l;
+            v_m_old = v_m;
+            v_l_old = v_l;
+            T_m_old = T_m;
+            T_l_old = T_l;
+            T_w_old = T_w;
 
             time_total += dt;       // Advance in time
 
