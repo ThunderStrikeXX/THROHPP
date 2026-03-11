@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <cassert>
 #include <string>
+#include <sstream>
 
 #include "steel.h"
 #include "liquid_sodium.h"
@@ -155,7 +156,7 @@ int main() {
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
     const double T_left = 1000.0;                        /// First node initialization temperature [K]
-    const double T_right = 1000.0;                       /// Last node initialization temperature [K]
+    const double T_right = 900.0;                       /// Last node initialization temperature [K]
 
     // Temperatures initialization
     for (int i = 0; i < N; ++i) {
@@ -184,7 +185,6 @@ int main() {
     std::vector<double> T_m_old = T_m;
     std::vector<double> T_l_old = T_l;
     std::vector<double> T_w_old = T_w;
-    std::vector<double> Gamma_xv_old = Gamma_xv;                           /// Exact mass volumetric source [kg/m3s]
 
     /// Iter variables
     std::vector<double> rho_m_iter = rho_m;
@@ -198,7 +198,6 @@ int main() {
     std::vector<double> T_m_iter = T_m;
     std::vector<double> T_l_iter = T_l;
     std::vector<double> T_w_iter = T_w;
-    std::vector<double> Gamma_xv_iter = Gamma_xv_old;                           /// Exact mass volumetric source [kg/m3s]
 
     std::vector<double> T_sur_iter = T_sur;
 
@@ -1809,6 +1808,75 @@ int main() {
                 }
             }
 
+            if (n == 72 && pic <= 12) {
+                std::cout << "=== TS 72, Picard iter " << pic << " ===" << std::endl;
+                auto p = [](double v) {
+                    std::ostringstream os;
+                    os << std::setprecision(2) << std::scientific << v;
+                    return os.str();
+                    };
+                std::cout << std::setw(3) << "i"
+                    << std::setw(12) << "rho_m" << std::setw(12) << "rho_l"
+                    << std::setw(12) << "alpha_m" << std::setw(12) << "alpha_l"
+                    << std::setw(12) << "p_m" << std::setw(12) << "p_l"
+                    << std::setw(12) << "v_m" << std::setw(12) << "v_l"
+                    << std::setw(12) << "T_m" << std::setw(12) << "T_l"
+                    << std::setw(12) << "T_w" << std::endl;
+                for (int i = 0; i < N; ++i) {
+                    std::cout << std::setw(3) << i
+                        << std::setw(12) << p(rho_m[i]) << std::setw(12) << p(rho_l[i])
+                        << std::setw(12) << p(alpha_m[i]) << std::setw(12) << p(alpha_l[i])
+                        << std::setw(12) << p(p_m[i]) << std::setw(12) << p(p_l[i])
+                        << std::setw(12) << p(v_m[i]) << std::setw(12) << p(v_l[i])
+                        << std::setw(12) << p(T_m[i]) << std::setw(12) << p(T_l[i])
+                        << std::setw(12) << p(T_w[i]) << std::endl;
+                }
+            }
+
+            // After solving the linear system, before updating variables
+            for (int i = 0; i < N; ++i) {
+                bool found_nan = false;
+                std::string var_name;
+                double var_val;
+
+                if (std::isnan(T_m[i])) { found_nan = true; var_name = "T_m";   var_val = T_m[i]; }
+                if (std::isnan(p_m[i])) { found_nan = true; var_name = "p_m";   var_val = p_m[i]; }
+                if (std::isnan(T_l[i])) { found_nan = true; var_name = "T_l";   var_val = T_l[i]; }
+                if (std::isnan(T_w[i])) { found_nan = true; var_name = "T_w";   var_val = T_w[i]; }
+                if (std::isnan(v_m[i])) { found_nan = true; var_name = "v_m";   var_val = v_m[i]; }
+                if (std::isnan(alpha_m[i])) { found_nan = true; var_name = "alpha_m"; var_val = alpha_m[i]; }
+
+                if (found_nan) {
+                    std::cout << "=== NaN DETECTED ===" << std::endl;
+                    std::cout << "Timestep: " << n << ", Picard iter: " << pic << ", Cell: " << i << std::endl;
+                    std::cout << "First NaN variable: " << var_name << std::endl;
+                    std::cout << "--- All variables at cell " << i << " ---" << std::endl;
+                    std::cout << "T_m  = " << T_m[i] << std::endl;
+                    std::cout << "p_m  = " << p_m[i] << std::endl;
+                    std::cout << "T_l  = " << T_l[i] << std::endl;
+                    std::cout << "T_w  = " << T_w[i] << std::endl;
+                    std::cout << "u_m  = " << v_m[i] << std::endl;
+                    std::cout << "alpha_m = " << alpha_m[i] << std::endl;
+                    std::cout << "--- Neighbors ---" << std::endl;
+                    if (i > 0) {
+                        std::cout << "Cell " << i - 1 << ": T_m=" << T_m[i - 1]
+                            << " p_m=" << p_m[i - 1] << " T_l=" << T_l[i - 1]
+                            << " T_w=" << T_w[i - 1] << std::endl;
+                    }
+                    if (i < N - 1) {
+                        std::cout << "Cell " << i + 1 << ": T_m=" << T_m[i + 1]
+                            << " p_m=" << p_m[i + 1] << " T_l=" << T_l[i + 1]
+                            << " T_w=" << T_w[i + 1] << std::endl;
+                    }
+                    std::cout << "--- Key coefficients ---" << std::endl;
+                    std::cout << "Gamma_xv = " << Gamma_xv[i] << std::endl;
+                    std::cout << "alpha_m_iter = " << alpha_m_iter[i] << std::endl;
+                    std::cout << "T_sur_iter = " << T_sur_iter[i] << std::endl;
+                    std::cout << "p_m_iter = " << p_m_iter[i] << std::endl;
+                    std::abort();
+                }
+            }
+
             // Check if variable converged
             for (int k = 0; k < B; ++k)
                 conv_var[k] = (L_pic[k] < pic_tol[k]);
@@ -1952,21 +2020,18 @@ int main() {
         else {
 
             // Rollback to previous time step (new = old) and halve dt
-            for (int i = 0; i < N; ++i) {
-                rho_m[i] = rho_m_old[i];
-                rho_l[i] = rho_l_old[i];
-                alpha_m[i] = alpha_m_old[i];
-                alpha_l[i] = alpha_l_old[i];
-                p_m[i] = p_m_old[i];
-                p_l[i] = p_l_old[i];
-                v_m[i] = v_m_old[i];
-                v_l[i] = v_l_old[i];
-                T_m[i] = T_m_old[i];
-                T_l[i] = T_l_old[i];
-                T_w[i] = T_w_old[i];
 
-                Gamma_xv[i] = Gamma_xv_old[i];
-            }
+            rho_m = rho_m_old;
+            rho_l = rho_l_old;
+            alpha_m = alpha_m_old;
+            alpha_l = alpha_l_old;
+            p_m = p_m_old;
+            p_l = p_l_old;
+            v_m = v_m_old;
+            v_l = v_l_old;
+            T_m = T_m_old;
+            T_l = T_l_old;
+            T_w = T_w_old;
 
             halves += 1;        // Half again the timestep
             n -= 1;             // No time iteration considered
