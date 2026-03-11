@@ -86,7 +86,7 @@ int main() {
 
     // Picard loops parameters	          
     int pic = 0;                                        /// Number of Picard iterations [-]
-    const int max_picard = 10;                         /// Maximum number of Picard iterations per timestep [-]
+    const int max_picard = 100;                         /// Maximum number of Picard iterations per timestep [-]
     std::array<double, B> L_pic;                        /// Picard residuals [-]
     std::array<bool, B> conv_var;                       /// Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   /// Tolerance for the convergence of Picard loop [-]
@@ -666,7 +666,7 @@ int main() {
                 add(D[i], 0, 4, 0.0
 
                     // Source term
-                    - C36[i]                  // Mass source from wick
+                    // - C36[i]                  // Mass source from wick
                 );
 
                 add(D[i], 0, 6, 0.0
@@ -679,25 +679,25 @@ int main() {
                 add(D[i], 0, 8, 0.0
 
                     // Source term
-                    - C37[i]                   // Mass source from wick
+                    // - C37[i]                   // Mass source from wick
                 );
 
                 add(D[i], 0, 9, 0.0
 
                     // Source term
-                    - C38[i]                   // Mass source from wick
+                    // - C38[i]                   // Mass source from wick
                 );
 
                 add(D[i], 0, 10, 0.0
 
                     // Source term
-                    - C39[i]                  // Mass source from wick
+                    // - C39[i]                  // Mass source from wick
                 );
 
                 Q[i][0] = 0.0
 
                     // Source term (implicit)
-                    + C40[i]                  // Mass source from wick
+                    // + C40[i]                  // Mass source from wick
 
                     // Temporal term
                     + (rho_m_iter[i] * alpha_m_old[i]) / dt
@@ -768,7 +768,7 @@ int main() {
                 add(D[i], 1, 4, 0.0
 
                     // Source term
-                    + C36[i]                 // Mass source from vapor
+                    // + C36[i]                 // Mass source from vapor
                 );
 
                 add(D[i], 1, 7, 0.0
@@ -781,19 +781,19 @@ int main() {
                 add(D[i], 1, 8, 0.0
 
                     // Source term
-                    + C37[i]                   // Mass source from vapor
+                    // + C37[i]                   // Mass source from vapor
                 );
 
                 add(D[i], 1, 9, 0.0
 
                     // Source term
-                    + C38[i]                  // Mass source from vapor
+                    // + C38[i]                  // Mass source from vapor
                 );
 
                 add(D[i], 1, 10, 0.0
 
                     // Source term
-                    + C39[i]                   // Mass source from vapor
+                    // + C39[i]                   // Mass source from vapor
                 );
 
 
@@ -812,7 +812,7 @@ int main() {
                         ) / dz
 
                     // Source term (implicit)
-                    - C40[i]                // Mass source from vapor
+                    // - C40[i]                // Mass source from vapor
                     ;
 
                 add(L[i], 1, 1, 0.0
@@ -876,17 +876,17 @@ int main() {
                     - (rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (v_m_iter[i] - v_m_iter[i - 1]) / (2 * dz)
+                    // + p_m_iter[i] * (v_m_iter[i] - v_m_iter[i - 1]) / (2 * dz)
 
                     // Pressure II term
-                    + p_m_iter[i] / dt
+                    // + p_m_iter[i] / dt
                 );
 
                 add(D[i], 2, 4, 0.0
 
                     // Source term
-                    - C46[i]                // Heat source due to heat flux from wick
-                    - C56[i]                  // Heat source due to mass flux from wick
+                    // - C46[i]                // Heat source due to heat flux from wick
+                    // - C56[i]                  // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 6, 0.0
@@ -896,7 +896,7 @@ int main() {
                     + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
+                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 2, 8, 0.0
@@ -912,22 +912,22 @@ int main() {
                     - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Source term
-                    - C47[i]                  // Heat source due to heat flux from wick
-                    - C57[i]                  // Heat source due to mass flux from wick
+                    // - C47[i]                  // Heat source due to heat flux from wick
+                    // - C57[i]                  // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 9, 0.0
 
                     // Source term
-                    - C48[i]                   // Heat source due to heat flux from wick
-                    - C58[i]                  // Heat source due to mass flux from wick
+                    // - C48[i]                   // Heat source due to heat flux from wick
+                    // - C58[i]                  // Heat source due to mass flux from wick
                 );
 
                 add(D[i], 2, 10, 0.0
 
                     // Source term
-                    - C49[i]                 // Heat source due to heat flux from wick
-                    - C59[i]                 // Heat source due to mass flux from wick
+                    // - C49[i]                 // Heat source due to heat flux from wick
+                    // - C59[i]                 // Heat source due to mass flux from wick
                 );  
 
                 Q[i][2] = 0.0
@@ -946,15 +946,15 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] / (2 * dz)
-                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i - 1] / (2 * dz)
+                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] / (2 * dz)
+                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i - 1] / (2 * dz)
 
                     // Pressure II term
-                    + (p_m_iter[i] * alpha_m_old[i]) / dt
+                    // + (p_m_iter[i] * alpha_m_old[i]) / dt
 
                     // Source term
-                    + C50[i]                  // Heat source due to heat flux from wick
-                    + C60[i]                  // Heat source due to mass flux from wick
+                    // + C50[i]                  // Heat source due to heat flux from wick
+                    // + C60[i]                  // Heat source due to mass flux from wick
                     ;
 
                 add(L[i], 2, 0, 0.0
@@ -969,7 +969,7 @@ int main() {
                     - (rho_m_iter[i - 1] * cv_m_l * T_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
 
                     // Pressure I term
-                    - p_m_iter[i] * (v_m_iter[i - 1]) / (2 * dz)
+                    // - p_m_iter[i] * (v_m_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 2, 6, 0.0
@@ -979,7 +979,7 @@ int main() {
                     - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
+                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 2, 8, 0.0
@@ -1003,7 +1003,7 @@ int main() {
                     + (rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
+                    // + p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
                 );
 
                 add(R[i], 2, 8, 0.0
@@ -1045,18 +1045,18 @@ int main() {
                     - eps_v * (rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    + eps_v * p_l_iter[i] * (v_l_iter[i] - v_l_iter[i - 1]) / (2 * dz)
+                    // + eps_v * p_l_iter[i] * (v_l_iter[i] - v_l_iter[i - 1]) / (2 * dz)
 
                     // Pressure II term
-                    + eps_v * p_l_iter[i] / dt
+                    // + eps_v * p_l_iter[i] / dt
                 );
 
                 add(D[i], 3, 4, 0.0
 
                     // Source term
-                    - C41[i]                      // Heat source due to heat flux from wall
-                    - C51[i]                      // Heat source due to mass flux from vapor
-                    - C61[i]                      // Heat source due to heat flux from vapor
+                    // - C41[i]                      // Heat source due to heat flux from wall
+                    // - C51[i]                      // Heat source due to mass flux from vapor
+                    // - C61[i]                      // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 7, 0.0
@@ -1066,15 +1066,15 @@ int main() {
                     + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
-                    + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
+                    // + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 3, 8, 0.0
 
                     // Source term
-                    - C42[i]                      // Heat source due to heat flux from wall
-                    - C52[i]                      // Heat source due to mass flux from vapor 
-                    - C62[i]                      // Heat source due to heat flux from vapor
+                    // - C42[i]                      // Heat source due to heat flux from wall
+                    // - C52[i]                      // Heat source due to mass flux from vapor 
+                    // - C62[i]                      // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 9, 0.0
@@ -1090,17 +1090,17 @@ int main() {
                     - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Source term
-                    - C43[i]                      // Heat source due to heat flux from wall
-                    - C53[i]                       // Heat source due to mass flux from vapor
-                    - C63[i]                      // Heat source due to heat flux from vapor
+                    // - C43[i]                      // Heat source due to heat flux from wall
+                    // - C53[i]                       // Heat source due to mass flux from vapor
+                    // - C63[i]                      // Heat source due to heat flux from vapor
                 );
 
                 add(D[i], 3, 10, 0.0
 
                     // Source term
-                    - C44[i]                      // Heat source due to heat flux from wall
-                    - C54[i]                      // Heat source due to mass flux from vapor 
-                    - C64[i]                     // Heat source due to heat flux from vapor
+                    // - C44[i]                      // Heat source due to heat flux from wall
+                    // - C54[i]                      // Heat source due to mass flux from vapor 
+                    // - C64[i]                     // Heat source due to heat flux from vapor
                 );
 
                 Q[i][3] = 0.0
@@ -1119,16 +1119,16 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (2 * dz)
-                    - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) * v_l_iter[i - 1] / (2 * dz)
+                    // + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (2 * dz)
+                    // - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) * v_l_iter[i - 1] / (2 * dz)
 
                     // Pressure II term
-                    + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
+                    // + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
 
                     // Source term
-                    + C45[i]                      // Heat source due to heat flux from wall
-                    + C55[i]                      // Heat source due to mass flux from vapor
-                    + C65[i]                      // Heat source due to heat flux from vapor
+                    // + C45[i]                      // Heat source due to heat flux from wall
+                    // + C55[i]                      // Heat source due to mass flux from vapor
+                    // + C65[i]                      // Heat source due to heat flux from vapor
                     ;
 
                 add(L[i], 3, 1, 0.0
@@ -1143,7 +1143,7 @@ int main() {
                     - eps_v * (rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
 
                     // Pressure I term
-                    - eps_v * p_l_iter[i] * (v_l_iter[i - 1]) / (2 * dz)
+                    // - eps_v * p_l_iter[i] * (v_l_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 3, 7, 0.0
@@ -1153,7 +1153,7 @@ int main() {
                     - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) / (2 * dz)
+                    // - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 3, 9, 0.0
@@ -1177,7 +1177,7 @@ int main() {
                     + eps_v * (rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
-                    + eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
+                    // + eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
                 );
 
                 add(R[i], 3, 9, 0.0
@@ -1209,19 +1209,19 @@ int main() {
                 add(D[i], 4, 4, 0.0
 
                     // Source term
-                    - C66[i]                      // Heat source due to heat flux from wick
+                    // - C66[i]                      // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 8, 0.0
 
                     // Source term
-                    - C67[i]                      // Heat source due to heat flux from wick
+                    // - C67[i]                      // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 9, 0.0
 
                     // Source term
-                    - C68[i]                      // Heat source due to heat flux from wick
+                    // - C68[i]                      // Heat source due to heat flux from wick
                 );
 
                 add(D[i], 4, 10, 0.0
@@ -1233,19 +1233,19 @@ int main() {
                     + (k_w_lf + k_w_rf) / (dz * dz)
 
                     // Source term
-                    - C69[i]                      // Heat source due to heat flux from wick
+                    // - C69[i]                      // Heat source due to heat flux from wick
                 );
 
                 Q[i][4] = 0.0
 
                     // Source term 
-                    + q_pp[i] * 2 * r_o / (r_o * r_o - r_i * r_i)
+                    // + q_pp[i] * 2 * r_o / (r_o * r_o - r_i * r_i)
 
                     // Temporal term
                     + (rho_w_p * cp_w_p * T_w_old[i]) / dt
 
                     // Source term
-                    + C70[i]                      // Heat source due to heat flux from wick
+                    // + C70[i]                      // Heat source due to heat flux from wick
                     ;
 
                 add(L[i], 4, 10, 0.0
@@ -1691,21 +1691,21 @@ int main() {
             for (int k = 0; k < B; ++k)
                 L_pic[k] /= N;
 
-            double alpha = 0.01;
+            double alpha = 1.0;
 
             // Update vectors from X
             for (int i = 0; i < N; ++i) {
-                rho_m[i] += alpha * X[i][0];
-                rho_l[i] += alpha * X[i][1];
-                alpha_m[i] += alpha * X[i][2];
-                alpha_l[i] += alpha * X[i][3];
-                p_m[i] += alpha * X[i][4];
-                p_l[i] += alpha * X[i][5];
-                v_m[i] += alpha * X[i][6];
-                v_l[i] += alpha * X[i][7];
-                T_m[i] += alpha * X[i][8];
-                T_l[i] += alpha * X[i][9];
-                T_w[i] += alpha * X[i][10];
+                rho_m[i] = alpha * X[i][0] + (1 - alpha) * rho_m[i];
+                rho_l[i] = alpha * X[i][1] + (1 - alpha) * rho_l[i];
+                alpha_m[i] = alpha * X[i][2] + (1 - alpha) * alpha_m[i];
+                alpha_l[i] = alpha * X[i][3] + (1 - alpha) * alpha_l[i];
+                p_m[i] = alpha * X[i][4] + (1 - alpha) * p_m[i];
+                p_l[i] = alpha * X[i][5] + (1 - alpha) * p_l[i];
+                v_m[i] = alpha * X[i][6] + (1 - alpha) * v_m[i];
+                v_l[i] = alpha * X[i][7] + (1 - alpha) * v_l[i];
+                T_m[i] = alpha * X[i][8] + (1 - alpha) * T_m[i];
+                T_l[i] = alpha * X[i][9] + (1 - alpha) * T_l[i];
+                T_w[i] = alpha * X[i][10] + (1 - alpha) * T_w[i];
 
                 // Check parabolic profiles
                 c_w[i] = C1[i] * p_m[i] + C2[i] * T_m[i] + C3[i] * T_l[i] + C4[i] * T_w[i] + C5[i];
