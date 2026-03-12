@@ -49,7 +49,7 @@ int main() {
     const double sigma_c = 0.05;            /// Condensation accomodation coefficient [-]. 1 means optimal condensation
 
     // Geometric parameters
-    const int N = 20;                                                           /// Number of axial nodes [-]
+    const int N = 8;                                                           /// Number of axial nodes [-]
     const double l = 0.982; 			                                        /// Length of the heat pipe [m]
     const double dz = l / N;                                                    /// Axial discretization step [m]
     const double evaporator_length = 0.502;                                     /// Evaporator length [m]
@@ -156,7 +156,7 @@ int main() {
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
     const double T_left = 1000.0;                        /// First node initialization temperature [K]
-    const double T_right = 900.0;                       /// Last node initialization temperature [K]
+    const double T_right = 1000.0;                       /// Last node initialization temperature [K]
 
     // Temperatures initialization
     for (int i = 0; i < N; ++i) {
@@ -426,6 +426,12 @@ int main() {
             v_l_iter[0] = 0.0;
             v_l_iter[N] = 0.0;
 
+            v_m[0] = 0.0;   // BC ingresso
+            v_m[N] = 0.0;   // BC uscita
+
+            v_l[0] = 0.0;
+            v_l[N] = 0.0;
+
             // Space discretization loop
             for (int i = 1; i < N - 1; ++i) {
 
@@ -649,8 +655,8 @@ int main() {
                     + alpha_m_iter[i] / dt
 
                     // Convective term
-                    + (alpha_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
-                    - (alpha_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
+                    + (alpha_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
+                    - (alpha_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
                 );
 
                 add(D[i], 0, 2, 0.0
@@ -659,8 +665,8 @@ int main() {
                     + rho_m_iter[i] / dt
 
                     // Convective term
-                    + (rho_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
-                    - (rho_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
+                    + (rho_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
+                    - (rho_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
                 );
 
                 add(D[i], 0, 4, 0.0
@@ -672,8 +678,8 @@ int main() {
                 add(D[i], 0, 6, 0.0
 
                     // Convective term
-                    + (alpha_m_iter[i] * rho_m_iter[i] * H(v_m_iter[i])) / dz
-                    + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
+                    - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * H(v_m_iter[i])) / dz
+                    - (alpha_m_iter[i] * rho_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
                 );
 
                 add(D[i], 0, 8, 0.0
@@ -700,47 +706,47 @@ int main() {
                     // + C40[i]                  // Mass source from wick
 
                     // Temporal term
-                    + (rho_m_iter[i] * alpha_m_old[i]) / dt
-                    + (rho_m_old[i] * alpha_m_iter[i]) / dt
+                    + (rho_m_old[i] * alpha_m_old[i]) / dt
+                    + (rho_m_iter[i] * alpha_m_iter[i]) / dt
 
                     // Convective term
                     + 2 * (
-                        + alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])
-                        + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))
-                        - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])
-                        - alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))
+                        + alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])
+                        + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))
+                        - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])
+                        - alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))
                         ) / dz
                     ;
 
                 add(L[i], 0, 0, 0.0
 
                     // Convective term
-                    - (alpha_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
+                    - (alpha_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])) / dz
                 );
 
                 add(L[i], 0, 2, 0.0
 
                     // Convective term
-                    - (rho_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
-                );
-
-                add(L[i], 0, 6, 0.0
-
-                    // Convective term
-                    - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
-                    - (alpha_m_iter[i] * rho_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
+                    - (rho_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])) / dz
                 );
 
                 add(R[i], 0, 0, 0.0
 
                     // Convective term
-                    + (alpha_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                    + (alpha_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
                 );
 
                 add(R[i], 0, 2, 0.0
 
                     // Convective term
-                    + (rho_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                    + (rho_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
+                );
+
+                add(R[i], 0, 6, 0.0
+
+                    // Convective term
+                    + (alpha_m_iter[i] * rho_m_iter[i] * H(v_m_iter[i + 1])) / dz
+                    + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
                 );
 
                 // --------------- MASS LIQUID EQUATION -----------------
@@ -751,8 +757,8 @@ int main() {
                     + eps_v * (alpha_l_iter[i] / dt)
 
                     // Convective term
-                    + eps_v * (alpha_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
-                    - eps_v * (alpha_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
+                    + eps_v * (alpha_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
+                    - eps_v * (alpha_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
                 );
 
                 add(D[i], 1, 3, 0.0
@@ -761,8 +767,8 @@ int main() {
                     + eps_v * (rho_l_iter[i] / dt)
 
                     // Convective term
-                    + eps_v * (rho_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
-                    - eps_v * (rho_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
+                    + eps_v * (rho_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
+                    - eps_v * (rho_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
                 );
 
                 add(D[i], 1, 4, 0.0
@@ -774,8 +780,8 @@ int main() {
                 add(D[i], 1, 7, 0.0
 
                     // Convective term
-                    + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * H(v_l_iter[i])) / dz
-                    + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * (1 - H(v_l_iter[i]))) / dz
+                    - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * H(v_l_iter[i])) / dz
+                    - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
                 );
 
                 add(D[i], 1, 8, 0.0
@@ -800,15 +806,15 @@ int main() {
                 Q[i][1] =
 
                     // Temporal term
-                    + eps_v * (rho_l_old[i] * alpha_l_iter[i]) / dt
-                    + eps_v * (rho_l_iter[i] * alpha_l_old[i]) / dt
+                    + eps_v * (rho_l_iter[i] * alpha_l_iter[i]) / dt
+                    + eps_v * (rho_l_old[i] * alpha_l_old[i]) / dt
 
                     // Convective term
                     + 2 * (
-                        + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i] * H(v_l_iter[i]))
-                        + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i])))
-                        - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1]))
-                        - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1])))
+                        + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1]))
+                        + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1])))
+                        - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * v_l_iter[i] * H(v_l_iter[i]))
+                        - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i])))
                         ) / dz
 
                     // Source term (implicit)
@@ -818,32 +824,32 @@ int main() {
                 add(L[i], 1, 1, 0.0
 
                     // Convective term
-                    - eps_v * (alpha_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
+                    - eps_v * (alpha_l_iter[i - 1] * v_l_iter[i] * H(v_l_iter[i])) / dz
                 );
 
                 add(L[i], 1, 3, 0.0
 
                     // Convective term
-                    - eps_v * (rho_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
-                );
-
-                add(L[i], 1, 7, 0.0
-
-                    // Convective term
-                    - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
-                    - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * (1 - H(v_l_iter[i - 1]))) / dz
+                    - eps_v * (rho_l_iter[i - 1] * v_l_iter[i] * H(v_l_iter[i])) / dz
                 );
 
                 add(R[i], 1, 1, 0.0
 
                     // Convective term
-                    + eps_v * (alpha_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
+                    + eps_v * (alpha_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
                 );
 
                 add(R[i], 1, 3, 0.0
 
                     // Convective term
-                    + eps_v * (rho_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
+                    + eps_v * (rho_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
+                );
+
+                add(R[i], 1, 7, 0.0
+
+                    // Convective term
+                    + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * H(v_l_iter[i + 1])) / dz
+                    + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
                 );
 
                 // ---------- MIXTURE HEAT EQUATION ----------------
@@ -876,10 +882,10 @@ int main() {
                     - (rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (v_m_iter[i] - v_m_iter[i - 1]) / (2 * dz)
+                    // + p_m_iter[i] * (v_m_iter[i] - v_m_iter[i - 1]) / (2 * dz)
 
                     // Pressure II term
-                    + p_m_iter[i] / dt
+                    // + p_m_iter[i] / dt
                 );
 
                 add(D[i], 2, 4, 0.0
@@ -896,7 +902,7 @@ int main() {
                     + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
+                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 2, 8, 0.0
@@ -905,7 +911,7 @@ int main() {
                     + (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p) / dt
 
                     // Diffusion term
-                    + (alpha_m_iter[i + 1] * k_m_r + 2 * alpha_m_iter[i] * k_m_p + alpha_m_iter[i - 1] * k_m_l) / (2 * dz * dz)
+                    // + (alpha_m_iter[i + 1] * k_m_r + 2 * alpha_m_iter[i] * k_m_p + alpha_m_iter[i - 1] * k_m_l) / (2 * dz * dz)
 
                     // Convective term
                     + (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * v_m_iter[i] * H(v_m_iter[i])) / dz
@@ -946,11 +952,11 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] / (2 * dz)
-                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i - 1] / (2 * dz)
+                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] / (2 * dz)
+                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i - 1] / (2 * dz)
 
                     // Pressure II term
-                    + (p_m_iter[i] * alpha_m_old[i]) / dt
+                    // + (p_m_iter[i] * alpha_m_old[i]) / dt
 
                     // Source term
                     // + C50[i]                  // Heat source due to heat flux from wick
@@ -969,7 +975,7 @@ int main() {
                     - (rho_m_iter[i - 1] * cv_m_l * T_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
 
                     // Pressure I term
-                    - p_m_iter[i] * (v_m_iter[i - 1]) / (2 * dz)
+                    // - p_m_iter[i] * (v_m_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 2, 6, 0.0
@@ -979,7 +985,7 @@ int main() {
                     - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
+                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 2, 8, 0.0
@@ -988,7 +994,7 @@ int main() {
                     - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cv_m_l * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
 
                     // Diffusion term
-                    - (alpha_m_iter[i - 1] * k_m_l + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)
+                    // - (alpha_m_iter[i - 1] * k_m_l + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)
                 );
 
                 add(R[i], 2, 0, 0.0
@@ -1003,7 +1009,7 @@ int main() {
                     + (rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
+                    // + p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
                 );
 
                 add(R[i], 2, 8, 0.0
@@ -1012,7 +1018,7 @@ int main() {
                     + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Diffusion term
-                    - (alpha_m_iter[i + 1] * k_m_r + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)
+                    // - (alpha_m_iter[i + 1] * k_m_r + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)
                 );
 
                 // ---------- LIQUID HEAT EQUATION ----------------
@@ -1045,10 +1051,10 @@ int main() {
                     - eps_v * (rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    + eps_v * p_l_iter[i] * (v_l_iter[i] - v_l_iter[i - 1]) / (2 * dz)
+                    // + eps_v * p_l_iter[i] * (v_l_iter[i] - v_l_iter[i - 1]) / (2 * dz)
 
                     // Pressure II term
-                    + eps_v * p_l_iter[i] / dt
+                    // + eps_v * p_l_iter[i] / dt
                 );
 
                 add(D[i], 3, 4, 0.0
@@ -1066,7 +1072,7 @@ int main() {
                     + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
-                    + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
+                    // + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 3, 8, 0.0
@@ -1083,7 +1089,7 @@ int main() {
                     + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p) / dt
 
                     // Diffusion term
-                    + eps_v * (alpha_l_iter[i + 1] * k_l_r + 2 * alpha_l_iter[i] * k_l_p + alpha_l_iter[i - 1] * k_l_l) / (2 * dz * dz)
+                    // + eps_v * (alpha_l_iter[i + 1] * k_l_r + 2 * alpha_l_iter[i] * k_l_p + alpha_l_iter[i - 1] * k_l_l) / (2 * dz * dz)
 
                     // Convective term
                     + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * v_l_iter[i] * H(v_l_iter[i])) / dz
@@ -1119,11 +1125,11 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (2 * dz)
-                    - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) * v_l_iter[i - 1] / (2 * dz)
+                    // + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (2 * dz)
+                    // - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) * v_l_iter[i - 1] / (2 * dz)
 
                     // Pressure II term
-                    + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
+                    // + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
 
                     // Source term
                     // + C45[i]                      // Heat source due to heat flux from wall
@@ -1143,7 +1149,7 @@ int main() {
                     - eps_v * (rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
 
                     // Pressure I term
-                    - eps_v * p_l_iter[i] * (v_l_iter[i - 1]) / (2 * dz)
+                    // - eps_v * p_l_iter[i] * (v_l_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 3, 7, 0.0
@@ -1153,7 +1159,7 @@ int main() {
                     - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * (1 - H(v_l_iter[i - 1]))) / dz
 
                     // Pressure I term
-                    - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) / (2 * dz)
+                    // - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) / (2 * dz)
                 );
 
                 add(L[i], 3, 9, 0.0
@@ -1162,7 +1168,7 @@ int main() {
                     - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l_l * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
 
                     // Diffusion term
-                    - eps_v * (alpha_l_iter[i - 1] * k_l_l + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)
+                    // - eps_v * (alpha_l_iter[i - 1] * k_l_l + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)
                 );
 
                 add(R[i], 3, 1, 0.0
@@ -1177,7 +1183,7 @@ int main() {
                     + eps_v * (rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
-                    + eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
+                    // + eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
                 );
 
                 add(R[i], 3, 9, 0.0
@@ -1186,7 +1192,7 @@ int main() {
                     + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
 
                     // Diffusion term
-                    - eps_v * (alpha_l_iter[i + 1] * k_l_r + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)
+                    // - eps_v * (alpha_l_iter[i + 1] * k_l_r + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)
                 );
 
                 // --------------- WALL HEAT EQUATION -------------------
@@ -1386,7 +1392,7 @@ int main() {
                     - eps_v * ((1 - H(v_l_iter[i])) * rho_l_iter[i] * v_l_iter[i] * v_l_iter[i]) / dz
 
                     // Capillary term (central differences)
-                    - (DPcap[i] + DPcap[i + 1]) / (2 * dz)
+                    // - (DPcap[i] + DPcap[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 6, 5, 0.0
@@ -1452,7 +1458,7 @@ int main() {
                     + eps_v * ((1 - H(v_l_iter[i])) * rho_l_iter[i + 1] * v_l_iter[i + 1] * v_l_iter[i + 1]) / dz
 
                     // Capillary term (central differences)
-                    + (DPcap[i] + DPcap[i + 1]) / (2 * dz)
+                    // + (DPcap[i] + DPcap[i + 1]) / (2 * dz)
                 );
 
                 add(R[i], 6, 5, 0.0
@@ -1504,13 +1510,36 @@ int main() {
                 add(D[i], 10, 4, 1);
                 add(D[i], 10, 5, -1);
 
-                Q[i][10] = DPcap[i];
+                Q[i][10] = 0.0 /*DPcap[i]*/;
 
                 #pragma endregion
 
                 // Densification of the D block for debug purposes
                 // DenseBlock D_dense = to_dense(D[i]);
             }
+
+            // After all equations are assembled, clear rows 6 and 7 for cell 1
+            auto clearRow = [](auto& block, int row) {
+                for (int k = block.row.size() - 1; k >= 0; --k) {
+                    if (block.row[k] == row) {
+                        block.row.erase(block.row.begin() + k);
+                        block.col.erase(block.col.begin() + k);
+                        block.val.erase(block.val.begin() + k);
+                    }
+                }
+                };
+
+            // Assemble ALL equations for cell 1 normally (including momentum)
+            // Then AFTER assembly, override only row 6 (v_m) and row 7 (v_l):
+
+            clearRow(L[1], 6); clearRow(D[1], 6); clearRow(R[1], 6);
+            clearRow(L[1], 7); clearRow(D[1], 7); clearRow(R[1], 7);
+
+            add(D[1], 6, 6, 1.0);
+            add(D[1], 7, 7, 1.0);
+
+            Q[1][6] = 0.0;
+            Q[1][7] = 0.0;
 
             // First node boundary conditions
 
@@ -1595,7 +1624,7 @@ int main() {
 
             double Aold, Anew, denom, eps;
 
-            for (int i = 0; i < N; ++i) {
+            for (int i = 1; i < N - 1; ++i) {
 
                 // rho_m
                 Aold = rho_m_iter[i];
@@ -1808,7 +1837,9 @@ int main() {
                 }
             }
 
-            if (n == 72 && pic <= 12) {
+            /*
+
+            if (n == 10000) {
                 std::cout << "=== TS 72, Picard iter " << pic << " ===" << std::endl;
                 auto p = [](double v) {
                     std::ostringstream os;
@@ -1877,6 +1908,204 @@ int main() {
                 }
             }
 
+            */
+
+            /*
+
+            {
+                std::cout << "=== LIQUID ENERGY PDE RESIDUAL (cell-by-cell) ===" << std::endl;
+                std::cout << std::setw(4) << "i"
+                    << std::setw(16) << "accumulation"
+                    << std::setw(16) << "convection"
+                    << std::setw(16) << "diffusion"
+                    << std::setw(16) << "residual" << std::endl;
+
+                for (int i = 1; i < N - 1; ++i) {
+                    double cp_l_p = liquid_sodium::cp_l_linear();
+                    double cp_l_l = liquid_sodium::cp_l_linear();
+                    double cp_l_r = liquid_sodium::cp_l_linear();
+                    double k_l_p = liquid_sodium::k(T_l_iter[i]);
+                    double k_l_l = liquid_sodium::k(T_l_iter[i - 1]);
+                    double k_l_r = liquid_sodium::k(T_l_iter[i + 1]);
+
+                    // --- Accumulation ---
+                    double accum =
+                        +eps_v * (alpha_l_iter[i] * cp_l_p * T_l_iter[i]) / dt * rho_l[i]
+                        + eps_v * (T_l_iter[i] * rho_l_iter[i] * cp_l_p) / dt * alpha_l[i]
+                        + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p) / dt * T_l[i]
+                        - eps_v * (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * rho_l_old[i]) / dt
+                        - eps_v * (alpha_l_iter[i] * cp_l_p * T_l_old[i] * rho_l_iter[i]) / dt
+                        - eps_v * (alpha_l_old[i] * cp_l_p * T_l_iter[i] * rho_l_iter[i]) / dt;
+
+                    // --- Convection ---
+                    // Diagonal contributions (cell i)
+                    double conv_D_rho =
+                        (+eps_v * (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
+                            - eps_v * (alpha_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz) * rho_l[i];
+
+                    double conv_D_alpha =
+                        (+eps_v * (rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
+                            - eps_v * (rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz) * alpha_l[i];
+
+                    double conv_D_v =
+                        (+eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * H(v_l_iter[i])) / dz
+                            + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * (1 - H(v_l_iter[i]))) / dz) * v_l[i];
+
+                    double conv_D_T =
+                        (+eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * v_l_iter[i] * H(v_l_iter[i])) / dz
+                            - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz) * T_l[i];
+
+                    // Q convective (negative)
+                    double conv_Q =
+                        -(3 * eps_v * (
+                            +alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])
+                            + alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))
+                            - alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])
+                            - alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))
+                            ) / dz);
+
+                    // Left neighbor contributions
+                    double conv_L_rho =
+                        (-eps_v * (alpha_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz) * rho_l[i - 1];
+
+                    double conv_L_alpha =
+                        (-eps_v * (rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz) * alpha_l[i - 1];
+
+                    double conv_L_v =
+                        (-eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
+                            - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * (1 - H(v_l_iter[i - 1]))) / dz) * v_l[i - 1];
+
+                    double conv_L_T =
+                        (-eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l_l * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz) * T_l[i - 1];
+
+                    // Right neighbor contributions
+                    double conv_R_rho =
+                        (+eps_v * (alpha_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz) * rho_l[i + 1];
+
+                    double conv_R_alpha =
+                        (+eps_v * (rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz) * alpha_l[i + 1];
+
+                    double conv_R_T =
+                        (+eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz) * T_l[i + 1];
+
+                    double conv = conv_D_rho + conv_D_alpha + conv_D_v + conv_D_T + conv_Q
+                        + conv_L_rho + conv_L_alpha + conv_L_v + conv_L_T
+                        + conv_R_rho + conv_R_alpha + conv_R_T;
+
+                    // --- Diffusion ---
+                    double diff =
+                        (+eps_v * (alpha_l_iter[i + 1] * k_l_r + 2 * alpha_l_iter[i] * k_l_p + alpha_l_iter[i - 1] * k_l_l) / (2 * dz * dz)) * T_l[i]
+                        + (-eps_v * (alpha_l_iter[i - 1] * k_l_l + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)) * T_l[i - 1]
+                        + (-eps_v * (alpha_l_iter[i + 1] * k_l_r + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)) * T_l[i + 1];
+
+                    double residual = accum + conv + diff;
+
+                    std::cout << std::setw(4) << i
+                        << std::setw(16) << std::scientific << std::setprecision(4) << accum
+                        << std::setw(16) << conv
+                        << std::setw(16) << diff
+                        << std::setw(16) << residual << std::endl;
+                }
+                std::cout << std::defaultfloat;
+            }
+
+            {
+                std::cout << "=== VAPOR ENERGY PDE RESIDUAL (cell-by-cell) ===" << std::endl;
+                std::cout << std::setw(4) << "i"
+                    << std::setw(16) << "accumulation"
+                    << std::setw(16) << "convection"
+                    << std::setw(16) << "diffusion"
+                    << std::setw(16) << "residual" << std::endl;
+
+                for (int i = 1; i < N - 1; ++i) {
+                    double cv_m_p = vapor_sodium::cp_g_linear();
+                    double cv_m_l = vapor_sodium::cp_g_linear();
+                    double cv_m_r = vapor_sodium::cp_g_linear();
+                    double k_m_p = vapor_sodium::k(T_m_iter[i], p_m_iter[i]);
+                    double k_m_l = vapor_sodium::k(T_m_iter[i - 1], p_m_iter[i - 1]);
+                    double k_m_r = vapor_sodium::k(T_m_iter[i + 1], p_m_iter[i + 1]);
+
+                    // --- Accumulation ---
+                    double accum =
+                        +(alpha_m_iter[i] * cv_m_p * T_m_iter[i]) / dt * rho_m[i]
+                        + (T_m_iter[i] * rho_m_iter[i] * cv_m_p) / dt * alpha_m[i]
+                        + (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p) / dt * T_m[i]
+                        - (alpha_m_iter[i] * cv_m_p * T_m_iter[i] * rho_m_old[i]) / dt
+                        - (alpha_m_iter[i] * cv_m_p * T_m_old[i] * rho_m_iter[i]) / dt
+                        - (alpha_m_old[i] * cv_m_p * T_m_iter[i] * rho_m_iter[i]) / dt;
+
+                    // --- Convection ---
+                    double conv_D_rho =
+                        (+(alpha_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
+                            - (alpha_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz) * rho_m[i];
+
+                    double conv_D_alpha =
+                        (+(rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
+                            - (rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz) * alpha_m[i];
+
+                    double conv_D_v =
+                        (+(alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * H(v_m_iter[i])) / dz
+                            + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz) * v_m[i];
+
+                    double conv_D_T =
+                        (+(alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * v_m_iter[i] * H(v_m_iter[i])) / dz
+                            - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz) * T_m[i];
+
+                    double conv_Q =
+                        -(3 * (
+                            +alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])
+                            + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))
+                            - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cv_m_l * T_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])
+                            - alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))
+                            ) / dz);
+
+                    double conv_L_rho =
+                        (-(alpha_m_iter[i - 1] * cv_m_l * T_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz) * rho_m[i - 1];
+
+                    double conv_L_alpha =
+                        (-(rho_m_iter[i - 1] * cv_m_l * T_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz) * alpha_m[i - 1];
+
+                    double conv_L_v =
+                        (-(alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cv_m_l * T_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
+                            - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz) * v_m[i - 1];
+
+                    double conv_L_T =
+                        (-(alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cv_m_l * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz) * T_m[i - 1];
+
+                    double conv_R_rho =
+                        (+(alpha_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz) * rho_m[i + 1];
+
+                    double conv_R_alpha =
+                        (+(rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz) * alpha_m[i + 1];
+
+                    double conv_R_T =
+                        (+(alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz) * T_m[i + 1];
+
+                    double conv = conv_D_rho + conv_D_alpha + conv_D_v + conv_D_T + conv_Q
+                        + conv_L_rho + conv_L_alpha + conv_L_v + conv_L_T
+                        + conv_R_rho + conv_R_alpha + conv_R_T;
+
+                    // --- Diffusion ---
+                    double diff =
+                        (+(alpha_m_iter[i + 1] * k_m_r + 2 * alpha_m_iter[i] * k_m_p + alpha_m_iter[i - 1] * k_m_l) / (2 * dz * dz)) * T_m[i]
+                        + (-(alpha_m_iter[i - 1] * k_m_l + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)) * T_m[i - 1]
+                        + (-(alpha_m_iter[i + 1] * k_m_r + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)) * T_m[i + 1];
+
+                    double residual = accum + conv + diff;
+
+                    std::cout << std::setw(4) << i
+                        << std::setw(16) << std::scientific << std::setprecision(4) << accum
+                        << std::setw(16) << conv
+                        << std::setw(16) << diff
+                        << std::setw(16) << residual << std::endl;
+                }
+                std::cout << std::defaultfloat;
+            }
+
+            */
+
+            printf("");
+
             // Check if variable converged
             for (int k = 0; k < B; ++k)
                 conv_var[k] = (L_pic[k] < pic_tol[k]);
@@ -1887,6 +2116,527 @@ int main() {
                 conv_all = conv_all && conv_var[k];
 
             if (conv_all) {
+
+                /*
+
+                {
+                    std::cout << "=== MASS FLUXES AT KEY FACES ===" << std::endl;
+                    for (int f = 0; f <= N; ++f) {
+                        double flux_m = 0, flux_l = 0;
+                        if (f > 0 && f < N) {
+                            // Vapor mass flux
+                            if (v_m[f] >= 0)
+                                flux_m = alpha_m[f - 1] * rho_m[f - 1] * v_m[f];
+                            else
+                                flux_m = alpha_m[f] * rho_m[f] * v_m[f];
+                            // Liquid mass flux
+                            if (v_l[f] >= 0)
+                                flux_l = eps_v * alpha_l[f - 1] * rho_l[f - 1] * v_l[f];
+                            else
+                                flux_l = eps_v * alpha_l[f] * rho_l[f] * v_l[f];
+                        }
+                        if (f <= 2 || f >= N - 2) {
+                            std::cout << "Face " << f
+                                << ": v_m=" << v_m[f] << " v_l=" << v_l[f]
+                                << " flux_m=" << flux_m << " flux_l=" << flux_l << std::endl;
+                        }
+                    }
+                }
+
+
+
+                {
+                    std::cout << "=== LIQUID MASS CELL-BY-CELL ===" << std::endl;
+                    std::cout << std::setw(4) << "i"
+                        << std::setw(16) << "accumulation"
+                        << std::setw(16) << "flux_left"
+                        << std::setw(16) << "flux_right"
+                        << std::setw(16) << "conv_net"
+                        << std::setw(16) << "residual" << std::endl;
+                    double total_accum = 0, total_conv = 0;
+                    for (int i = 1; i < N - 1; ++i) {
+                        double accum = eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
+                        double flux_right, flux_left;
+                        if (v_l[i + 1] >= 0)
+                            flux_right = eps_v * alpha_l[i] * rho_l[i] * v_l[i + 1];
+                        else
+                            flux_right = eps_v * alpha_l[i + 1] * rho_l[i + 1] * v_l[i + 1];
+                        if (v_l[i] >= 0)
+                            flux_left = eps_v * alpha_l[i - 1] * rho_l[i - 1] * v_l[i];
+                        else
+                            flux_left = eps_v * alpha_l[i] * rho_l[i] * v_l[i];
+                        double conv_net = flux_right - flux_left;
+                        double residual = accum + conv_net;
+                        total_accum += accum;
+                        total_conv += conv_net;
+                        std::cout << std::setw(4) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << accum
+                            << std::setw(16) << flux_left
+                            << std::setw(16) << flux_right
+                            << std::setw(16) << conv_net
+                            << std::setw(16) << residual << std::endl;
+                    }
+                    std::cout << "TOTAL accum=" << total_accum << " conv=" << total_conv
+                        << " residual=" << total_accum + total_conv << std::endl;
+}
+                {
+                    std::cout << "=== VAPOR MASS CELL-BY-CELL ===" << std::endl;
+                    std::cout << std::setw(4) << "i"
+                        << std::setw(16) << "accumulation"
+                        << std::setw(16) << "flux_left"
+                        << std::setw(16) << "flux_right"
+                        << std::setw(16) << "conv_net"
+                        << std::setw(16) << "residual" << std::endl;
+                    double total_accum = 0, total_conv = 0;
+                    for (int i = 1; i < N - 1; ++i) {
+                        double accum = (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
+                        double flux_right, flux_left;
+                        if (v_m[i + 1] >= 0)
+                            flux_right = alpha_m[i] * rho_m[i] * v_m[i + 1];
+                        else
+                            flux_right = alpha_m[i + 1] * rho_m[i + 1] * v_m[i + 1];
+                        if (v_m[i] >= 0)
+                            flux_left = alpha_m[i - 1] * rho_m[i - 1] * v_m[i];
+                        else
+                            flux_left = alpha_m[i] * rho_m[i] * v_m[i];
+                        double conv_net = flux_right - flux_left;
+                        double residual = accum + conv_net;
+                        total_accum += accum;
+                        total_conv += conv_net;
+                        std::cout << std::setw(4) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << accum
+                            << std::setw(16) << flux_left
+                            << std::setw(16) << flux_right
+                            << std::setw(16) << conv_net
+                            << std::setw(16) << residual << std::endl;
+                    }
+                    std::cout << "TOTAL accum=" << total_accum << " conv=" << total_conv
+                        << " residual=" << total_accum + total_conv << std::endl;
+                }
+
+                */
+                /*
+
+                {
+                    std::cout << "=== VAPOR MASS LINEARIZED RESIDUAL ===" << std::endl;
+                    std::cout << std::setw(4) << "i"
+                        << std::setw(16) << "accum"
+                        << std::setw(16) << "conv_D"
+                        << std::setw(16) << "conv_L"
+                        << std::setw(16) << "conv_R"
+                        << std::setw(16) << "conv_Q"
+                        << std::setw(16) << "residual" << std::endl;
+
+                    for (int i = 1; i < N - 1; ++i) {
+                        // --- Accumulation (D terms - Q temporal) ---
+                        double accum_D = (0.0
+                            + alpha_m_iter[i] / dt
+                            ) * rho_m[i]
+                            + (0.0
+                                + rho_m_iter[i] / dt
+                                ) * alpha_m[i];
+
+                        double accum_Q =
+                            +(rho_m_old[i] * alpha_m_old[i]) / dt
+                            + (rho_m_iter[i] * alpha_m_iter[i]) / dt;
+
+                        double accum = accum_D - accum_Q;
+
+                        // --- Convection from D (cell i) ---
+                        double conv_D_rho = (0.0
+                            + (alpha_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
+                            - (alpha_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
+                            ) * rho_m[i];
+
+                        double conv_D_alpha = (0.0
+                            + (rho_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
+                            - (rho_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
+                            ) * alpha_m[i];
+
+                        double conv_D_v = (0.0
+                            + (alpha_m_iter[i] * rho_m_iter[i] * H(v_m_iter[i])) / dz
+                            + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
+                            ) * v_m[i];
+
+                        double conv_D = conv_D_rho + conv_D_alpha + conv_D_v;
+
+                        // --- Convection from L (cell i-1) ---
+                        double conv_L = (0.0
+                            - (alpha_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
+                            ) * rho_m[i - 1]
+                            + (0.0
+                                - (rho_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
+                                ) * alpha_m[i - 1]
+                            + (0.0
+                                - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
+                                - (alpha_m_iter[i] * rho_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
+                                ) * v_m[i - 1];
+
+                        // --- Convection from R (cell i+1) ---
+                        double conv_R = (0.0
+                            + (alpha_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                            ) * rho_m[i + 1]
+                            + (0.0
+                                + (rho_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                                ) * alpha_m[i + 1];
+
+                        // --- Convection from Q ---
+                        double conv_Q = -2 * (
+                            +alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])
+                            + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))
+                            - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])
+                            - alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))
+                            ) / dz;
+
+                        double conv_total = conv_D + conv_L + conv_R + conv_Q;
+                        double residual = accum + conv_total;
+
+                        std::cout << std::setw(4) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << accum
+                            << std::setw(16) << conv_D
+                            << std::setw(16) << conv_L
+                            << std::setw(16) << conv_R
+                            << std::setw(16) << conv_Q
+                            << std::setw(16) << residual << std::endl;
+                    }
+                    std::cout << std::defaultfloat;
+                }
+
+                {
+                    std::cout << "=== LIQUID MASS LINEARIZED RESIDUAL ===" << std::endl;
+                    std::cout << std::setw(4) << "i"
+                        << std::setw(16) << "accum"
+                        << std::setw(16) << "conv_D"
+                        << std::setw(16) << "conv_L"
+                        << std::setw(16) << "conv_R"
+                        << std::setw(16) << "conv_Q"
+                        << std::setw(16) << "residual" << std::endl;
+
+                    for (int i = 1; i < N - 1; ++i) {
+                        // --- Accumulation (D terms - Q temporal) ---
+                        double accum_D = (0.0
+                            + eps_v * (alpha_l_iter[i] / dt)
+                            ) * rho_l[i]
+                            + (0.0
+                                + eps_v * (rho_l_iter[i] / dt)
+                                ) * alpha_l[i];
+
+                        double accum_Q =
+                            +eps_v * (rho_l_iter[i] * alpha_l_iter[i]) / dt
+                            + eps_v * (rho_l_old[i] * alpha_l_old[i]) / dt;
+
+                        double accum = accum_D - accum_Q;
+
+                        // --- Convection from D (cell i) ---
+                        double conv_D_rho = (0.0
+                            + eps_v * (alpha_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
+                            - eps_v * (alpha_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
+                            ) * rho_l[i];
+
+                        double conv_D_alpha = (0.0
+                            + eps_v * (rho_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
+                            - eps_v * (rho_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
+                            ) * alpha_l[i];
+
+                        double conv_D_v = (0.0
+                            + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * H(v_l_iter[i])) / dz
+                            + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * (1 - H(v_l_iter[i]))) / dz
+                            ) * v_l[i];
+
+                        double conv_D = conv_D_rho + conv_D_alpha + conv_D_v;
+
+                        // --- Convection from L (cell i-1) ---
+                        double conv_L = (0.0
+                            - eps_v * (alpha_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
+                            ) * rho_l[i - 1]
+                            + (0.0
+                                - eps_v * (rho_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
+                                ) * alpha_l[i - 1]
+                            + (0.0
+                                - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
+                                - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * (1 - H(v_l_iter[i - 1]))) / dz
+                                ) * v_l[i - 1];
+
+                        // --- Convection from R (cell i+1) ---
+                        double conv_R = (0.0
+                            + eps_v * (alpha_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
+                            ) * rho_l[i + 1]
+                            + (0.0
+                                + eps_v * (rho_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
+                                ) * alpha_l[i + 1];
+
+                        // --- Convection from Q ---
+                        double conv_Q = -2 * (
+                            +eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i] * H(v_l_iter[i]))
+                            + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i])))
+                            - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1]))
+                            - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1])))
+                            ) / dz;
+
+                        double conv_total = conv_D + conv_L + conv_R + conv_Q;
+                        double residual = accum + conv_total;
+
+                        std::cout << std::setw(4) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << accum
+                            << std::setw(16) << conv_D
+                            << std::setw(16) << conv_L
+                            << std::setw(16) << conv_R
+                            << std::setw(16) << conv_Q
+                            << std::setw(16) << residual << std::endl;
+                    }
+                    std::cout << std::defaultfloat;
+                }
+
+                {
+                    std::cout << "=== GLOBAL MASS CONSERVATION CHECK ===" << std::endl;
+
+                    // --- Real conservation ---
+                    double real_accum_m = 0, real_accum_l = 0;
+                    double real_flux_left_m = 0, real_flux_left_l = 0;
+                    double real_flux_right_m = 0, real_flux_right_l = 0;
+
+                    for (int i = 1; i < N - 1; ++i) {
+                        real_accum_m += (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
+                        real_accum_l += eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
+                    }
+
+                    // Left boundary: face 1 (v=0)
+                    // Right boundary: face N-1 (v=0)
+                    // So boundary fluxes should be zero
+
+                    // But let's also check face 2 and face N-2 (first/last internal faces)
+                    // Face 2: between cell 1 and cell 2
+                    if (v_m[2] >= 0) real_flux_left_m = alpha_m[1] * rho_m[1] * v_m[2];
+                    else              real_flux_left_m = alpha_m[2] * rho_m[2] * v_m[2];
+                    if (v_l[2] >= 0) real_flux_left_l = eps_v * alpha_l[1] * rho_l[1] * v_l[2];
+                    else              real_flux_left_l = eps_v * alpha_l[2] * rho_l[2] * v_l[2];
+
+                    // Face N-2: between cell N-3 and cell N-2
+                    if (v_m[N - 2] >= 0) real_flux_right_m = alpha_m[N - 3] * rho_m[N - 3] * v_m[N - 2];
+                    else                real_flux_right_m = alpha_m[N - 2] * rho_m[N - 2] * v_m[N - 2];
+                    if (v_l[N - 2] >= 0) real_flux_right_l = eps_v * alpha_l[N - 3] * rho_l[N - 3] * v_l[N - 2];
+                    else                real_flux_right_l = eps_v * alpha_l[N - 2] * rho_l[N - 2] * v_l[N - 2];
+
+                    std::cout << "  REAL (true conservation):" << std::endl;
+                    std::cout << "    Vapor:  accum=" << real_accum_m << std::endl;
+                    std::cout << "    Liquid: accum=" << real_accum_l << std::endl;
+                    std::cout << "    Total:  accum=" << real_accum_m + real_accum_l << std::endl;
+
+                    // --- Linearized conservation (sum of D*X + L*X + R*X - Q) ---
+                    double lin_accum_m = 0, lin_conv_m = 0;
+                    double lin_accum_l = 0, lin_conv_l = 0;
+
+                    for (int i = 1; i < N - 1; ++i) {
+                        // Vapor
+                        double accum_D_m = (alpha_m_iter[i] / dt) * rho_m[i]
+                            + (rho_m_iter[i] / dt) * alpha_m[i];
+                        double accum_Q_m = (rho_m_old[i] * alpha_m_old[i]) / dt
+                            + (rho_m_iter[i] * alpha_m_iter[i]) / dt;
+                        lin_accum_m += (accum_D_m - accum_Q_m) * dz;
+
+                        // Liquid
+                        double accum_D_l = eps_v * (alpha_l_iter[i] / dt) * rho_l[i]
+                            + eps_v * (rho_l_iter[i] / dt) * alpha_l[i];
+                        double accum_Q_l = eps_v * (rho_l_iter[i] * alpha_l_iter[i]) / dt
+                            + eps_v * (rho_l_old[i] * alpha_l_old[i]) / dt;
+                        lin_accum_l += (accum_D_l - accum_Q_l) * dz;
+                    }
+
+                    std::cout << "  LINEARIZED (what the solver sees):" << std::endl;
+                    std::cout << "    Vapor:  accum=" << lin_accum_m << std::endl;
+                    std::cout << "    Liquid: accum=" << lin_accum_l << std::endl;
+                    std::cout << "    Total:  accum=" << lin_accum_m + lin_accum_l << std::endl;
+
+                    std::cout << "  DIFFERENCE (real - linearized):" << std::endl;
+                    std::cout << "    Vapor:  " << real_accum_m - lin_accum_m << std::endl;
+                    std::cout << "    Liquid: " << real_accum_l - lin_accum_l << std::endl;
+                    std::cout << "    Total:  " << (real_accum_m + real_accum_l) - (lin_accum_m + lin_accum_l) << std::endl;
+                }
+
+                std::cout << "Ghost 0: alpha_l=" << alpha_l[0] << " rho_l=" << rho_l[0]
+                    << " alpha_l_old=" << alpha_l_old[0] << " rho_l_old=" << rho_l_old[0] << std::endl;
+                std::cout << "Cell  1: alpha_l=" << alpha_l[1] << " rho_l=" << rho_l[1]
+                    << " alpha_l_old=" << alpha_l_old[1] << " rho_l_old=" << rho_l_old[1] << std::endl;
+                std::cout << "Cell  " << N - 2 << ": alpha_l=" << alpha_l[N - 2] << " rho_l=" << rho_l[N - 2]
+                    << " alpha_l_old=" << alpha_l_old[N - 2] << " rho_l_old=" << rho_l_old[N - 2] << std::endl;
+                std::cout << "Ghost " << N - 1 << ": alpha_l=" << alpha_l[N - 1] << " rho_l=" << rho_l[N - 1]
+                    << " alpha_l_old=" << alpha_l_old[N - 1] << " rho_l_old=" << rho_l_old[N - 1] << std::endl;
+
+                {
+                    std::cout << "=== GHOST CELL MASS CHECK ===" << std::endl;
+
+                    double cp_l = liquid_sodium::cp_l_linear();
+
+                    // --- Ghost cell 0 ---
+                    double accum_m_0 = (alpha_m[0] * rho_m[0] - alpha_m_old[0] * rho_m_old[0]) / dt * dz;
+                    double accum_l_0 = eps_v * (alpha_l[0] * rho_l[0] - alpha_l_old[0] * rho_l_old[0]) / dt * dz;
+
+                    // Face 0 (left of ghost 0)
+                    double flux_m_f0 = 0, flux_l_f0 = 0;
+                    // v_m[0], v_l[0] should be 0
+                    flux_m_f0 = alpha_m[0] * rho_m[0] * v_m[0]; // doesn't matter which upwind, v=0
+                    flux_l_f0 = eps_v * alpha_l[0] * rho_l[0] * v_l[0];
+
+                    // Face 1 (right of ghost 0, left of cell 1)
+                    double flux_m_f1 = 0, flux_l_f1 = 0;
+                    if (v_m[1] >= 0) flux_m_f1 = alpha_m[0] * rho_m[0] * v_m[1];
+                    else              flux_m_f1 = alpha_m[1] * rho_m[1] * v_m[1];
+                    if (v_l[1] >= 0) flux_l_f1 = eps_v * alpha_l[0] * rho_l[0] * v_l[1];
+                    else              flux_l_f1 = eps_v * alpha_l[1] * rho_l[1] * v_l[1];
+
+                    std::cout << "  Ghost cell 0:" << std::endl;
+                    std::cout << "    v_m[0]=" << v_m[0] << " v_m[1]=" << v_m[1]
+                        << " v_l[0]=" << v_l[0] << " v_l[1]=" << v_l[1] << std::endl;
+                    std::cout << "    Vapor:  accum=" << accum_m_0 << " flux_f0=" << flux_m_f0
+                        << " flux_f1=" << flux_m_f1 << " balance=" << accum_m_0 + flux_m_f1 - flux_m_f0 << std::endl;
+                    std::cout << "    Liquid: accum=" << accum_l_0 << " flux_f0=" << flux_l_f0
+                        << " flux_f1=" << flux_l_f1 << " balance=" << accum_l_0 + flux_l_f1 - flux_l_f0 << std::endl;
+
+                    // --- Ghost cell N-1 ---
+                    double accum_m_N = (alpha_m[N - 1] * rho_m[N - 1] - alpha_m_old[N - 1] * rho_m_old[N - 1]) / dt * dz;
+                    double accum_l_N = eps_v * (alpha_l[N - 1] * rho_l[N - 1] - alpha_l_old[N - 1] * rho_l_old[N - 1]) / dt * dz;
+
+                    // Face N-1 (left of ghost N-1, right of cell N-2)
+                    double flux_m_fNm1 = 0, flux_l_fNm1 = 0;
+                    if (v_m[N - 1] >= 0) flux_m_fNm1 = alpha_m[N - 2] * rho_m[N - 2] * v_m[N - 1];
+                    else                flux_m_fNm1 = alpha_m[N - 1] * rho_m[N - 1] * v_m[N - 1];
+                    if (v_l[N - 1] >= 0) flux_l_fNm1 = eps_v * alpha_l[N - 2] * rho_l[N - 2] * v_l[N - 1];
+                    else                flux_l_fNm1 = eps_v * alpha_l[N - 1] * rho_l[N - 1] * v_l[N - 1];
+
+                    // Face N (right of ghost N-1)
+                    double flux_m_fN = 0, flux_l_fN = 0;
+                    // v_m[N], v_l[N] should be 0
+                    flux_m_fN = alpha_m[N - 1] * rho_m[N - 1] * v_m[N];
+                    flux_l_fN = eps_v * alpha_l[N - 1] * rho_l[N - 1] * v_l[N];
+
+                    std::cout << "  Ghost cell N-1:" << std::endl;
+                    std::cout << "    v_m[N-1]=" << v_m[N - 1] << " v_m[N]=" << v_m[N]
+                        << " v_l[N-1]=" << v_l[N - 1] << " v_l[N]=" << v_l[N] << std::endl;
+                    std::cout << "    Vapor:  accum=" << accum_m_N << " flux_fNm1=" << flux_m_fNm1
+                        << " flux_fN=" << flux_m_fN << " balance=" << accum_m_N + flux_m_fN - flux_m_fNm1 << std::endl;
+                    std::cout << "    Liquid: accum=" << accum_l_N << " flux_fNm1=" << flux_l_fNm1
+                        << " flux_fN=" << flux_l_fN << " balance=" << accum_l_N + flux_l_fN - flux_l_fNm1 << std::endl;
+
+                    // --- Combined: physical domain + ghost cells ---
+                    double total_accum_m = accum_m_0 + accum_m_N;
+                    double total_accum_l = accum_l_0 + accum_l_N;
+                    for (int i = 1; i < N - 1; ++i) {
+                        total_accum_m += (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
+                        total_accum_l += eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
+                    }
+                    std::cout << "  ALL CELLS (physical + ghost):" << std::endl;
+                    std::cout << "    Vapor total accum:  " << total_accum_m << std::endl;
+                    std::cout << "    Liquid total accum: " << total_accum_l << std::endl;
+                    std::cout << "    Total accum:        " << total_accum_m + total_accum_l << std::endl;
+                }
+                */
+
+                {
+                    std::cout << "=== PHYSICAL DOMAIN MASS BALANCE ===" << std::endl;
+
+                    // --- LIQUID ---
+
+                    std::cout << "\n  --- LIQUID ---" << std::endl;
+                    std::cout << std::setw(4) << "i" << std::setw(16) << "accumulation" << std::endl;
+
+                    double total_accum_l = 0;
+
+                    for (int i = 1; i < N - 1; ++i) {
+                        double accum = eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
+                        total_accum_l += accum;
+                        std::cout << std::setw(4) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << accum << std::endl;
+                    }
+
+                    std::cout << "  Total accum: " << total_accum_l << std::endl;
+
+                    std::cout << "\n  Convective fluxes at faces:" << std::endl;
+                    std::cout << std::setw(6) << "face" << std::setw(16) << "flux" << std::endl;
+
+                    double total_flux_l = 0;
+                    double total_net_l = 0;
+
+                    std::vector<double> face_flux_l(N + 1, 0.0);
+
+                    for (int f = 1; f < N; ++f) {
+                        if (v_l[f] >= 0)
+                            face_flux_l[f] = eps_v * alpha_l[f - 1] * rho_l[f - 1] * v_l[f];
+                        else
+                            face_flux_l[f] = eps_v * alpha_l[f] * rho_l[f] * v_l[f];
+                    }
+
+                    std::cout << std::setw(6) << "cell"
+                        << std::setw(16) << "flux_left"
+                        << std::setw(16) << "flux_right"
+                        << std::setw(16) << "net(R-L)" << std::endl;
+
+                    for (int i = 1; i < N - 1; ++i) {
+                        double net = face_flux_l[i + 1] - face_flux_l[i];
+                        total_net_l += net;
+                        std::cout << std::setw(6) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << face_flux_l[i]
+                            << std::setw(16) << face_flux_l[i + 1]
+                            << std::setw(16) << net << std::endl;
+                    }
+
+                    std::cout << "  Sum of nets: " << total_net_l << std::endl;
+                    std::cout << "  Boundary check (face[N-1] - face[1]): " << face_flux_l[N - 1] - face_flux_l[1] << std::endl;
+                    std::cout << "  Telescoping error: " << total_net_l - (face_flux_l[N - 1] - face_flux_l[1]) << std::endl;
+                    std::cout << "  Net flux (in - out): " << total_flux_l << std::endl;
+                    std::cout << "  Balance (accum - net flux): " << total_accum_l - total_flux_l << std::endl;
+
+                    // --- VAPOR ---
+                    std::cout << "\n  --- VAPOR ---" << std::endl;
+                    std::cout << std::setw(4) << "i"
+                        << std::setw(16) << "accumulation" << std::endl;
+                    double total_accum_m = 0;
+                    for (int i = 1; i < N - 1; ++i) {
+                        double accum = (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
+                        total_accum_m += accum;
+                        std::cout << std::setw(4) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << accum << std::endl;
+                    }
+                    std::cout << "  Total accum: " << total_accum_m << std::endl;
+
+                    std::cout << "\n  Convective fluxes at faces:" << std::endl;
+                    std::cout << std::setw(6) << "face"
+                        << std::setw(16) << "flux" << std::endl;
+                    double total_flux_m = 0;
+                    double total_net_m = 0;
+                    std::vector<double> face_flux_m(N + 1, 0.0);
+
+                    // Compute all face fluxes
+                    for (int f = 1; f < N; ++f) {
+                        if (v_m[f] >= 0)
+                            face_flux_m[f] = alpha_m[f - 1] * rho_m[f - 1] * v_m[f];
+                        else
+                            face_flux_m[f] = alpha_m[f] * rho_m[f] * v_m[f];
+                    }
+
+                    // Per-cell net flux and telescoping check
+                    std::cout << std::setw(6) << "cell"
+                        << std::setw(16) << "flux_left"
+                        << std::setw(16) << "flux_right"
+                        << std::setw(16) << "net(R-L)" << std::endl;
+                    for (int i = 1; i < N - 1; ++i) {
+                        double net = face_flux_m[i + 1] - face_flux_m[i];
+                        total_net_m += net;
+                        std::cout << std::setw(6) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << face_flux_m[i]
+                            << std::setw(16) << face_flux_m[i + 1]
+                            << std::setw(16) << net << std::endl;
+                    }
+                    std::cout << "  Sum of nets: " << total_net_m << std::endl;
+                    std::cout << "  Boundary check (face[N-1] - face[1]): " << face_flux_m[N - 1] - face_flux_m[1] << std::endl;
+                    std::cout << "  Telescoping error: " << total_net_m - (face_flux_m[N - 1] - face_flux_m[1]) << std::endl;
+                    std::cout << "  Net flux (in - out): " << total_flux_m << std::endl;
+                    std::cout << "  Balance (accum - net flux): " << total_accum_m - total_flux_m << std::endl;
+
+                    std::cout << "\n  --- TOTAL ---" << std::endl;
+                    std::cout << "  Total accum: " << total_accum_m + total_accum_l << std::endl;
+                    std::cout << "  Total net flux: " << total_flux_m + total_flux_l << std::endl;
+                    std::cout << "  Total balance: " << (total_accum_m + total_accum_l) - (total_flux_m + total_flux_l) << std::endl;
+                }
 
                 halves = 0;             // Reset halves if Picard converged
                 break;                  // Picard converged, so break the loops
