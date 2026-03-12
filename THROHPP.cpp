@@ -291,7 +291,7 @@ int main() {
 
 	q_pp_output << std::setprecision(global_precision);
 
-    for (int i = 0; i < N - 2; ++i) << mesh[i] << " ";
+    for (int i = 0; i < N - 2; ++i) mesh_output << mesh[i] << " ";
 
     mesh_output.flush();
     mesh_output.close();
@@ -911,7 +911,7 @@ int main() {
                     + (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p) / dt
 
                     // Diffusion term
-                    // + (alpha_m_iter[i + 1] * k_m_r + 2 * alpha_m_iter[i] * k_m_p + alpha_m_iter[i - 1] * k_m_l) / (2 * dz * dz)
+                    + (alpha_m_iter[i + 1] * k_m_r + 2 * alpha_m_iter[i] * k_m_p + alpha_m_iter[i - 1] * k_m_l) / (2 * dz * dz)
 
                     // Convective term
                     + (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
@@ -984,7 +984,7 @@ int main() {
                     - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cv_m_l * v_m_iter[i] * H(v_m_iter[i])) / dz
 
                     // Diffusion term
-                    // - (alpha_m_iter[i - 1] * k_m_l + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)
+                    - (alpha_m_iter[i - 1] * k_m_l + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)
                 );
 
                 add(R[i], 2, 0, 0.0
@@ -1018,7 +1018,7 @@ int main() {
                     + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cv_m_r * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
 
                     // Diffusion term
-                    // - (alpha_m_iter[i + 1] * k_m_r + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)
+                    - (alpha_m_iter[i + 1] * k_m_r + alpha_m_iter[i] * k_m_p) / (2 * dz * dz)
                 );
 
                 // ---------- LIQUID HEAT EQUATION ----------------
@@ -1089,7 +1089,7 @@ int main() {
                     + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p) / dt
 
                     // Diffusion term
-                    // + eps_v * (alpha_l_iter[i + 1] * k_l_r + 2 * alpha_l_iter[i] * k_l_p + alpha_l_iter[i - 1] * k_l_l) / (2 * dz * dz)
+                    + eps_v * (alpha_l_iter[i + 1] * k_l_r + 2 * alpha_l_iter[i] * k_l_p + alpha_l_iter[i - 1] * k_l_l) / (2 * dz * dz)
 
                     // Convective term
                     + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
@@ -1158,7 +1158,7 @@ int main() {
                     - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l_l * v_l_iter[i] * H(v_l_iter[i])) / dz
 
                     // Diffusion term
-                    // - eps_v * (alpha_l_iter[i - 1] * k_l_l + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)
+                    - eps_v * (alpha_l_iter[i - 1] * k_l_l + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)
                 );
 
                 add(R[i], 3, 1, 0.0
@@ -1192,7 +1192,7 @@ int main() {
                     + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
 
                     // Diffusion term
-                    // - eps_v * (alpha_l_iter[i + 1] * k_l_r + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)
+                    - eps_v * (alpha_l_iter[i + 1] * k_l_r + alpha_l_iter[i] * k_l_p) / (2 * dz * dz)
                 );
 
                 // --------------- WALL HEAT EQUATION -------------------
