@@ -51,7 +51,7 @@ int main() {
     // Geometric parameters
     const int N = 8;                                                           /// Number of axial nodes [-]
     const double l = 0.982; 			                                        /// Length of the heat pipe [m]
-    const double dz = l / N;                                                    /// Axial discretization step [m]
+    const double dz = l / (N - 2);                                                    /// Axial discretization step [m]
     const double evaporator_length = 0.502;                                     /// Evaporator length [m]
     const double adiabatic_length = 0.188;                                      /// Adiabatic length [m]
     const double condenser_length = 0.292;                                      /// Condenser length [m]
@@ -105,8 +105,8 @@ int main() {
     };
 
     // Mesh z positions
-    std::vector<double> mesh(N, 0.0);
-    for (int i = 1; i < N - 1; ++i) mesh[i] = i * dz;     /// Mesh discretization
+    std::vector<double> mesh(N - 2, 0.0);
+    for (int i = 0; i < N - 2; ++i) mesh[i] = i * dz;     /// Mesh discretization
 
     // State variables definition and initialization
     std::vector<double> rho_m(N, 0.01);                 /// Mixture density [kg/m3]
@@ -291,7 +291,7 @@ int main() {
 
 	q_pp_output << std::setprecision(global_precision);
 
-    for (int i = 0; i < N; ++i) mesh_output << i * dz << " ";
+    for (int i = 0; i < N - 2; ++i) << mesh[i] << " ";
 
     mesh_output.flush();
     mesh_output.close();
@@ -1051,10 +1051,10 @@ int main() {
                     - eps_v * (rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
-                    // + eps_v * p_l_iter[i] * (v_l_iter[i] - v_l_iter[i - 1]) / (2 * dz)
+                    + eps_v * p_l_iter[i] * (v_l_iter[i + 1] - v_l_iter[i]) / (2 * dz)
 
                     // Pressure II term
-                    // + eps_v * p_l_iter[i] / dt
+                    + eps_v * p_l_iter[i] / dt
                 );
 
                 add(D[i], 3, 4, 0.0
@@ -1072,7 +1072,7 @@ int main() {
                     - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
-                    // + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
+                    - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 3, 8, 0.0
@@ -1125,11 +1125,11 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    // + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i] / (2 * dz)
-                    // - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) * v_l_iter[i - 1] / (2 * dz)
+                    + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) * v_l_iter[i + 1] / (2 * dz)
+                    - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) * v_l_iter[i] / (2 * dz)
 
                     // Pressure II term
-                    // + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
+                    + eps_v * (p_l_iter[i] * alpha_l_old[i]) / dt
 
                     // Source term
                     // + C45[i]                      // Heat source due to heat flux from wall
@@ -1149,13 +1149,7 @@ int main() {
                     - eps_v * (rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i] * H(v_l_iter[i])) / dz
 
                     // Pressure I term
-                    // - eps_v * p_l_iter[i] * (v_l_iter[i - 1]) / (2 * dz)
-                );
-
-                add(L[i], 3, 7, 0.0
-
-                    // Pressure I term
-                    // - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i - 1]) / (2 * dz)
+                    - eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
                 );
 
                 add(L[i], 3, 9, 0.0
@@ -1179,10 +1173,13 @@ int main() {
                     + eps_v * (rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
 
                     // Pressure I term
-                    // + eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
+                    + eps_v * p_l_iter[i] * (v_l_iter[i + 1]) / (2 * dz)
                 );
 
                 add(R[i], 3, 7, 0.0
+
+                    // Pressure I term
+                    + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
 
                     // Convective term
                     + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * H(v_l_iter[i + 1])) / dz
