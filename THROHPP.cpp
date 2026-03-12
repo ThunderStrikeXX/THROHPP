@@ -1121,7 +1121,7 @@ int main() {
 
                     // Convective term
                     + 3 * eps_v * (
-                        +alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1])
+                        + alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1])
                         + alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l_r * T_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))
                         - alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l_l * T_l_iter[i - 1] * v_l_iter[i] * H(v_l_iter[i])
                         - alpha_l_iter[i] * rho_l_iter[i] * cp_l_p * T_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i]))
@@ -1950,6 +1950,8 @@ int main() {
 
             if (conv_all) {
 
+                /*
+
                 {
                     std::cout << "=== VAPOR MASS CELL-BY-CELL ===" << std::endl;
                     std::cout << std::setw(4) << "i"
@@ -2549,224 +2551,126 @@ int main() {
                         << std::endl;
                 }
 
-                /*
+                */
 
+                /*
+ 
                 {
                     std::cout << "=== PHYSICAL DOMAIN MOMENTUM BALANCE ===" << std::endl;
-
-                    // =========================================================
-                    // LIQUID MOMENTUM
-                    // =========================================================
-                    std::cout << "\n  --- LIQUID MOMENTUM ---" << std::endl;
-                    std::cout << std::setw(4) << "i"
-                        << std::setw(20) << "accumulation" << std::endl;
-
-                    double total_accum_ml = 0.0;
-
-                    for (int i = 1; i < N - 1; ++i) {
-                        double m_now = eps_v * alpha_l[i] * rho_l[i] * v_l[i];
-                        double m_old = eps_v * alpha_l_old[i] * rho_l_old[i] * v_l_old[i];
-
-                        double accum = (m_now - m_old) / dt * dz;
-                        total_accum_ml += accum;
-
-                        std::cout << std::setw(4) << i
-                            << std::setw(20) << std::scientific << std::setprecision(6)
-                            << accum << std::endl;
-                    }
-
-                    std::cout << "  Total accum: " << total_accum_ml << std::endl;
-
-
-                    // ---------- Convective flux ----------
-                    std::cout << "\n  Convective momentum fluxes at faces:" << std::endl;
-
-                    std::vector<double> face_flux_conv_l(N + 1, 0.0);
-                    double total_net_conv_l = 0.0;
-
-                    for (int f = 1; f < N; ++f) {
-                        if (v_l[f] >= 0.0) {
-                            face_flux_conv_l[f] = eps_v * alpha_l[f - 1] * rho_l[f - 1] * v_l[f] * v_l[f];
-                        }
-                        else {
-                            face_flux_conv_l[f] = eps_v * alpha_l[f] * rho_l[f] * v_l[f] * v_l[f];
-                        }
-                    }
-
-                    std::cout << std::setw(6) << "cell"
-                        << std::setw(20) << "flux_left"
-                        << std::setw(20) << "flux_right"
-                        << std::setw(20) << "net(R-L)" << std::endl;
-
-                    for (int i = 1; i < N - 1; ++i) {
-                        double net = face_flux_conv_l[i + 1] - face_flux_conv_l[i];
-                        total_net_conv_l += net;
-
-                        std::cout << std::setw(6) << i
-                            << std::setw(20) << std::scientific << std::setprecision(6) << face_flux_conv_l[i]
-                            << std::setw(20) << face_flux_conv_l[i + 1]
-                            << std::setw(20) << net << std::endl;
-                    }
-
-                    std::cout << "  Sum of convective nets: " << total_net_conv_l << std::endl;
-                    std::cout << "  Boundary check (face[N-1] - face[1]): "
-                        << face_flux_conv_l[N - 1] - face_flux_conv_l[1] << std::endl;
-                    std::cout << "  Telescoping error: "
-                        << total_net_conv_l - (face_flux_conv_l[N - 1] - face_flux_conv_l[1]) << std::endl;
-
-                    // ---------- Pressure flux ----------
-                    std::cout << "\n  Pressure fluxes at faces:" << std::endl;
-
-                    std::vector<double> face_flux_pres_l(N + 1, 0.0);
-                    double total_net_pres_l = 0.0;
-
-                    for (int f = 1; f < N; ++f) {
-                        double alpha_face = 0.5 * (alpha_l[f - 1] + alpha_l[f]);
-                        double p_face = 0.5 * (p_l[f - 1] + p_l[f]);   // oppure p_m se usi una pressione comune
-                        face_flux_pres_l[f] = eps_v * alpha_face * p_face;
-                    }
-
-                    std::cout << std::setw(6) << "cell"
-                        << std::setw(20) << "pres_left"
-                        << std::setw(20) << "pres_right"
-                        << std::setw(20) << "net(R-L)" << std::endl;
-
-                    for (int i = 1; i < N - 1; ++i) {
-                        double net = face_flux_pres_l[i + 1] - face_flux_pres_l[i];
-                        total_net_pres_l += net;
-
-                        std::cout << std::setw(6) << i
-                            << std::setw(20) << std::scientific << std::setprecision(6) << face_flux_pres_l[i]
-                            << std::setw(20) << face_flux_pres_l[i + 1]
-                            << std::setw(20) << net << std::endl;
-                    }
-
-                    std::cout << "  Sum of pressure nets: " << total_net_pres_l << std::endl;
-                    std::cout << "  Boundary check (face[N-1] - face[1]): "
-                        << face_flux_pres_l[N - 1] - face_flux_pres_l[1] << std::endl;
-                    std::cout << "  Telescoping error: "
-                        << total_net_pres_l - (face_flux_pres_l[N - 1] - face_flux_pres_l[1]) << std::endl;
-
-
-                    // ---------- Total liquid momentum balance ----------
-                    std::cout << "  Balance (accum + conv + pres): "
-                        << total_accum_ml + total_net_conv_l + total_net_pres_l << std::endl;
-
 
                     // =========================================================
                     // VAPOR MOMENTUM
                     // =========================================================
                     std::cout << "\n  --- VAPOR MOMENTUM ---" << std::endl;
-                    std::cout << std::setw(4) << "i"
-                        << std::setw(20) << "accumulation" << std::endl;
+                    std::cout << std::setw(4) << "face"
+                        << std::setw(20) << "accumulation"
+                        << std::setw(20) << "convection"
+                        << std::setw(20) << "pressure"
+                        << std::setw(20) << "residual" << std::endl;
 
-                    double total_accum_mm = 0.0;
+                    double total_accum_mm = 0.0, total_conv_mm = 0.0, total_pres_mm = 0.0;
 
-                    for (int i = 1; i < N - 1; ++i) {
-                        double m_now = alpha_m[i] * rho_m[i] * v_m[i];
-                        double m_old = alpha_m_old[i] * rho_m_old[i] * v_m_old[i];
+                    // Momentum equation at face i (v_m[i]), between cell i-1 and cell i
+                    for (int i = 2; i < N - 1; ++i) {
+                        // Accumulation: d/dt (alpha*rho*V)|_{face i}
+                        double arho_new = (alpha_m[i - 1] * rho_m[i - 1] + alpha_m[i] * rho_m[i]) / 2.0;
+                        double arho_old = (alpha_m_old[i - 1] * rho_m_old[i - 1] + alpha_m_old[i] * rho_m_old[i]) / 2.0;
+                        double accum = (arho_new * v_m[i] - arho_old * v_m_old[i]) / dt;
 
-                        double accum = (m_now - m_old) / dt * dz;
-                        total_accum_mm += accum;
+                        // Convection: d/dz(alpha*rho*V^2)|_{face i}
+                        double conv;
+                        if (v_m[i] >= 0) {
+                            conv = (alpha_m[i] * rho_m[i] * v_m[i] * v_m[i]
+                                - alpha_m[i - 1] * rho_m[i - 1] * v_m[i - 1] * v_m[i - 1]) / dz;
+                        }
+                        else {
+                            conv = (alpha_m[i] * rho_m[i] * v_m[i + 1] * v_m[i + 1]
+                                - alpha_m[i - 1] * rho_m[i - 1] * v_m[i] * v_m[i]) / dz;
+                        }
+
+                        // Pressure: alpha * dp/dz
+                        double alpha_face = (alpha_m[i - 1] + alpha_m[i]) / 2.0;
+                        double pres = alpha_face * (p_m[i] - p_m[i - 1]) / dz;
+
+                        double residual = accum + conv + pres;
+
+                        total_accum_mm += accum * dz;
+                        total_conv_mm += conv * dz;
+                        total_pres_mm += pres * dz;
 
                         std::cout << std::setw(4) << i
-                            << std::setw(20) << std::scientific << std::setprecision(6)
-                            << accum << std::endl;
+                            << std::setw(20) << std::scientific << std::setprecision(6) << accum * dz
+                            << std::setw(20) << conv * dz
+                            << std::setw(20) << pres * dz
+                            << std::setw(20) << residual * dz << std::endl;
                     }
 
                     std::cout << "  Total accum: " << total_accum_mm << std::endl;
+                    std::cout << "  Total conv:  " << total_conv_mm << std::endl;
+                    std::cout << "  Total pres:  " << total_pres_mm << std::endl;
+                    std::cout << "  Total residual: " << total_accum_mm + total_conv_mm + total_pres_mm << std::endl;
 
+                    // =========================================================
+                    // LIQUID MOMENTUM
+                    // =========================================================
+                    std::cout << "\n  --- LIQUID MOMENTUM ---" << std::endl;
+                    std::cout << std::setw(4) << "face"
+                        << std::setw(20) << "accumulation"
+                        << std::setw(20) << "convection"
+                        << std::setw(20) << "pressure"
+                        << std::setw(20) << "residual" << std::endl;
 
-                    // ---------- Convective flux ----------
-                    std::cout << "\n  Convective momentum fluxes at faces:" << std::endl;
+                    double total_accum_ml = 0.0, total_conv_ml = 0.0, total_pres_ml = 0.0;
 
-                    std::vector<double> face_flux_conv_m(N + 1, 0.0);
-                    double total_net_conv_m = 0.0;
+                    for (int i = 2; i < N - 1; ++i) {
+                        // Accumulation
+                        double arho_new = eps_v * (alpha_l[i - 1] * rho_l[i - 1] + alpha_l[i] * rho_l[i]) / 2.0;
+                        double arho_old = eps_v * (alpha_l_old[i - 1] * rho_l_old[i - 1] + alpha_l_old[i] * rho_l_old[i]) / 2.0;
+                        double accum = (arho_new * v_l[i] - arho_old * v_l_old[i]) / dt;
 
-                    for (int f = 1; f < N; ++f) {
-                        if (v_m[f] >= 0.0) {
-                            face_flux_conv_m[f] = alpha_m[f - 1] * rho_m[f - 1] * v_m[f] * v_m[f];
+                        // Convection
+                        double conv;
+                        if (v_l[i] >= 0) {
+                            conv = eps_v * (alpha_l[i] * rho_l[i] * v_l[i] * v_l[i]
+                                - alpha_l[i - 1] * rho_l[i - 1] * v_l[i - 1] * v_l[i - 1]) / dz;
                         }
                         else {
-                            face_flux_conv_m[f] = alpha_m[f] * rho_m[f] * v_m[f] * v_m[f];
+                            conv = eps_v * (alpha_l[i] * rho_l[i] * v_l[i + 1] * v_l[i + 1]
+                                - alpha_l[i - 1] * rho_l[i - 1] * v_l[i] * v_l[i]) / dz;
                         }
+
+                        // Pressure
+                        double alpha_face = eps_v * (alpha_l[i - 1] + alpha_l[i]) / 2.0;
+                        double pres = alpha_face * (p_l[i] - p_l[i - 1]) / dz;
+
+                        double residual = accum + conv + pres;
+
+                        total_accum_ml += accum * dz;
+                        total_conv_ml += conv * dz;
+                        total_pres_ml += pres * dz;
+
+                        std::cout << std::setw(4) << i
+                            << std::setw(20) << std::scientific << std::setprecision(6) << accum * dz
+                            << std::setw(20) << conv * dz
+                            << std::setw(20) << pres * dz
+                            << std::setw(20) << residual * dz << std::endl;
                     }
 
-                    std::cout << std::setw(6) << "cell"
-                        << std::setw(20) << "flux_left"
-                        << std::setw(20) << "flux_right"
-                        << std::setw(20) << "net(R-L)" << std::endl;
-
-                    for (int i = 1; i < N - 1; ++i) {
-                        double net = face_flux_conv_m[i + 1] - face_flux_conv_m[i];
-                        total_net_conv_m += net;
-
-                        std::cout << std::setw(6) << i
-                            << std::setw(20) << std::scientific << std::setprecision(6) << face_flux_conv_m[i]
-                            << std::setw(20) << face_flux_conv_m[i + 1]
-                            << std::setw(20) << net << std::endl;
-                    }
-
-                    std::cout << "  Sum of convective nets: " << total_net_conv_m << std::endl;
-                    std::cout << "  Boundary check (face[N-1] - face[1]): "
-                        << face_flux_conv_m[N - 1] - face_flux_conv_m[1] << std::endl;
-                    std::cout << "  Telescoping error: "
-                        << total_net_conv_m - (face_flux_conv_m[N - 1] - face_flux_conv_m[1]) << std::endl;
-
-
-                    // ---------- Pressure flux ----------
-                    std::cout << "\n  Pressure fluxes at faces:" << std::endl;
-
-                    std::vector<double> face_flux_pres_m(N + 1, 0.0);
-                    double total_net_pres_m = 0.0;
-
-                    for (int f = 1; f < N; ++f) {
-                        double alpha_face = 0.5 * (alpha_m[f - 1] + alpha_m[f]);
-                        double p_face = 0.5 * (p_m[f - 1] + p_m[f]);
-                        face_flux_pres_m[f] = alpha_face * p_face;
-                    }
-
-                    std::cout << std::setw(6) << "cell"
-                        << std::setw(20) << "pres_left"
-                        << std::setw(20) << "pres_right"
-                        << std::setw(20) << "net(R-L)" << std::endl;
-
-                    for (int i = 1; i < N - 1; ++i) {
-                        double net = face_flux_pres_m[i + 1] - face_flux_pres_m[i];
-                        total_net_pres_m += net;
-
-                        std::cout << std::setw(6) << i
-                            << std::setw(20) << std::scientific << std::setprecision(6) << face_flux_pres_m[i]
-                            << std::setw(20) << face_flux_pres_m[i + 1]
-                            << std::setw(20) << net << std::endl;
-                    }
-
-                    std::cout << "  Sum of pressure nets: " << total_net_pres_m << std::endl;
-                    std::cout << "  Boundary check (face[N-1] - face[1]): "
-                        << face_flux_pres_m[N - 1] - face_flux_pres_m[1] << std::endl;
-                    std::cout << "  Telescoping error: "
-                        << total_net_pres_m - (face_flux_pres_m[N - 1] - face_flux_pres_m[1]) << std::endl;
-
-
-                    // ---------- Total vapor momentum balance ----------
-                    std::cout << "  Balance (accum + conv + pres): "
-                        << total_accum_mm + total_net_conv_m + total_net_pres_m << std::endl;
-
+                    std::cout << "  Total accum: " << total_accum_ml << std::endl;
+                    std::cout << "  Total conv:  " << total_conv_ml << std::endl;
+                    std::cout << "  Total pres:  " << total_pres_ml << std::endl;
+                    std::cout << "  Total residual: " << total_accum_ml + total_conv_ml + total_pres_ml << std::endl;
 
                     // =========================================================
                     // TOTAL MOMENTUM
                     // =========================================================
                     std::cout << "\n  --- TOTAL MOMENTUM ---" << std::endl;
-
-                    double total_accum = total_accum_ml + total_accum_mm;
-                    double total_conv = total_net_conv_l + total_net_conv_m;
-                    double total_pres = total_net_pres_l + total_net_pres_m;
-
-                    std::cout << "  Total accum: " << total_accum << std::endl;
-                    std::cout << "  Total conv:  " << total_conv << std::endl;
-                    std::cout << "  Total pres:  " << total_pres << std::endl;
-                    std::cout << "  Total balance (accum + conv + pres): "
-                        << total_accum + total_conv + total_pres << std::endl;
+                    std::cout << "  Total accum: " << total_accum_mm + total_accum_ml << std::endl;
+                    std::cout << "  Total conv:  " << total_conv_mm + total_conv_ml << std::endl;
+                    std::cout << "  Total pres:  " << total_pres_mm + total_pres_ml << std::endl;
+                    std::cout << "  Total residual: "
+                        << (total_accum_mm + total_accum_ml) + (total_conv_mm + total_conv_ml) + (total_pres_mm + total_pres_ml)
+                        << std::endl;
                 }
 
                 */
