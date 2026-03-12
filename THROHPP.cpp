@@ -1891,6 +1891,8 @@ int main() {
                 }
             }
 
+            */
+
             // After solving the linear system, before updating variables
             for (int i = 0; i < N; ++i) {
                 bool found_nan = false;
@@ -1934,10 +1936,6 @@ int main() {
                     std::abort();
                 }
             }
-
-            */
-
-            printf("");
 
             // Check if variable converged
             for (int k = 0; k < B; ++k)
@@ -2697,7 +2695,7 @@ int main() {
 
             time_total += dt;       // Advance in time
 
-            const int output_every = 1;
+            const int output_every = 100;
 
             if (n % output_every == 0) {
                 for (int i = 0; i < N; ++i) {
