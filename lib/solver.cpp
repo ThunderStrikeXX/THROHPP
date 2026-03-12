@@ -1,3 +1,13 @@
+#include <stdexcept>
+#include <sstream>
+#include <cmath>
+#include <array>
+#include <algorithm>
+#include <iomanip>
+#include <string>
+#include <vector>
+#include <iostream>
+
 #include "solver.h"
 
 // ========================
@@ -51,13 +61,14 @@ void matvec(const DenseBlock& A, const double x[B], double y[B]) {
 }
 
 void matmul(const DenseBlock& A, const DenseBlock& Bm, DenseBlock& C) {
-    for (int i = 0; i < B; ++i)
+    for (int i = 0; i < B; ++i) {
         for (int j = 0; j < B; ++j) {
             double s = 0.0;
             for (int k = 0; k < B; ++k)
                 s += A[i][k] * Bm[k][j];
             C[i][j] = s;
         }
+    }
 }
 
 void subtract_inplace(DenseBlock& A, const DenseBlock& Bm) {
@@ -66,12 +77,98 @@ void subtract_inplace(DenseBlock& A, const DenseBlock& Bm) {
             A[i][j] -= Bm[i][j];
 }
 
+static std::string block_to_string(const DenseBlock& A) {
+    std::ostringstream oss;
+    oss << std::setprecision(16);
+    for (int r = 0; r < B; ++r) {
+        for (int c = 0; c < B; ++c)
+            oss << std::setw(24) << A[r][c] << ' ';
+        oss << '\n';
+    }
+    return oss.str();
+}
+
+static double block_max_abs(const DenseBlock& A) {
+    double maxv = 0.0;
+    for (int r = 0; r < B; ++r)
+        for (int c = 0; c < B; ++c)
+            maxv = std::max(maxv, std::fabs(A[r][c]));
+    return maxv;
+}
+
+// ========================
+// Column scaling
+// ========================
+static std::array<double, B> compute_column_scaling(
+    const std::vector<DenseBlock>& Ld,
+    const std::vector<DenseBlock>& Dd,
+    const std::vector<DenseBlock>& Rd) {
+    std::array<double, B> colMax{};
+    for (int j = 0; j < B; ++j)
+        colMax[j] = 0.0;
+
+    const int Nx = static_cast<int>(Dd.size());
+
+    for (int i = 0; i < Nx; ++i) {
+        for (int r = 0; r < B; ++r) {
+            for (int c = 0; c < B; ++c) {
+                colMax[c] = std::max(colMax[c], std::fabs(Dd[i][r][c]));
+                if (i > 0)
+                    colMax[c] = std::max(colMax[c], std::fabs(Ld[i][r][c]));
+                if (i < Nx - 1)
+                    colMax[c] = std::max(colMax[c], std::fabs(Rd[i][r][c]));
+            }
+        }
+    }
+
+    std::array<double, B> scale{};
+    for (int j = 0; j < B; ++j) {
+        if (colMax[j] > 0.0)
+            scale[j] = 1.0 / colMax[j];
+        else
+            scale[j] = 1.0;
+    }
+
+    return scale;
+}
+
+static void apply_column_scaling(DenseBlock& A, const std::array<double, B>& scale) {
+    for (int r = 0; r < B; ++r)
+        for (int c = 0; c < B; ++c)
+            A[r][c] *= scale[c];
+}
+
+static void apply_column_scaling_to_system(
+    std::vector<DenseBlock>& Ld,
+    std::vector<DenseBlock>& Dd,
+    std::vector<DenseBlock>& Rd,
+    const std::array<double, B>& scale) {
+    const int Nx = static_cast<int>(Dd.size());
+    for (int i = 0; i < Nx; ++i) {
+        apply_column_scaling(Dd[i], scale);
+        if (i > 0)      apply_column_scaling(Ld[i], scale);
+        if (i < Nx - 1) apply_column_scaling(Rd[i], scale);
+    }
+}
+
+static void unscale_solution(
+    std::vector<VecBlock>& X,
+    const std::array<double, B>& scale) {
+    const int Nx = static_cast<int>(X.size());
+    for (int i = 0; i < Nx; ++i)
+        for (int j = 0; j < B; ++j)
+            X[i][j] *= scale[j];
+}
+
 // ========================
 // LU factorization
 // ========================
-void lu_factor(DenseBlock& A, std::array<int, B>& piv) {
+void lu_factor(DenseBlock& A, std::array<int, B>& piv, int blockIndex, const char* blockName) {
     for (int i = 0; i < B; ++i)
         piv[i] = i;
+
+    const double amax = block_max_abs(A);
+    const double pivot_tol = 1e-14 * std::max(1.0, amax);
 
     for (int k = 0; k < B; ++k) {
         int p = k;
@@ -85,8 +182,21 @@ void lu_factor(DenseBlock& A, std::array<int, B>& piv) {
             }
         }
 
-        if (maxv == 0.0)
-            throw std::runtime_error("LU: singular matrix");
+        if (maxv < pivot_tol) {
+            std::ostringstream oss;
+            oss << "LU factorization failed: singular or nearly singular block detected.\n"
+                << "Block name      = " << blockName << '\n'
+                << "Global index    = " << blockIndex << '\n'
+                << "Pivot step k    = " << k << '\n'
+                << "Pivot row p     = " << p << '\n'
+                << "Pivot candidate = " << maxv << '\n'
+                << "Tolerance       = " << pivot_tol << '\n'
+                << "Block contents:\n"
+                << block_to_string(A);
+
+            std::cerr << oss.str() << std::endl;
+            throw std::runtime_error("LU factorization failed");
+        }
 
         if (p != k) {
             std::swap(piv[k], piv[p]);
@@ -96,7 +206,7 @@ void lu_factor(DenseBlock& A, std::array<int, B>& piv) {
 
         for (int i = k + 1; i < B; ++i) {
             A[i][k] /= A[k][k];
-            double lik = A[i][k];
+            const double lik = A[i][k];
             for (int j = k + 1; j < B; ++j)
                 A[i][j] -= lik * A[k][j];
         }
@@ -116,6 +226,9 @@ void lu_solve_vec(
     for (int i = 0; i < B; ++i)
         for (int j = 0; j < i; ++j)
             y[i] -= LU[i][j] * y[j];
+
+    for (int i = 0; i < B; ++i)
+        x[i] = 0.0;
 
     for (int i = B - 1; i >= 0; --i) {
         for (int j = i + 1; j < B; ++j)
@@ -164,6 +277,10 @@ void solve_block_tridiag(
         if (i < Nx - 1) Rd[i] = to_dense(R[i]);
     }
 
+    // Global column scaling for all local variables
+    const std::array<double, B> colScale = compute_column_scaling(Ld, Dd, Rd);
+    apply_column_scaling_to_system(Ld, Dd, Rd, colScale);
+
     std::vector<VecBlock> Qm = Q;
     X.assign(Nx, VecBlock{});
 
@@ -171,22 +288,24 @@ void solve_block_tridiag(
     std::vector<bool> factored(Nx, false);
 
     for (int i = 1; i < Nx; ++i) {
-        int im1 = i - 1;
+        const int im1 = i - 1;
 
         if (!factored[im1]) {
-            lu_factor(Dd[im1], piv[im1]);
+            lu_factor(Dd[im1], piv[im1], im1, "D");
             factored[im1] = true;
         }
 
-        DenseBlock Xtemp;
+        DenseBlock Xtemp{};
         lu_solve_mat(Dd[im1], piv[im1], Rd[im1], Xtemp);
 
-        DenseBlock L_X;
+        DenseBlock L_X{};
         matmul(Ld[i], Xtemp, L_X);
         subtract_inplace(Dd[i], L_X);
 
         double y[B], q_prev[B];
-        for (int k = 0; k < B; ++k) q_prev[k] = Qm[im1][k];
+        for (int k = 0; k < B; ++k)
+            q_prev[k] = Qm[im1][k];
+
         lu_solve_vec(Dd[im1], piv[im1], q_prev, y);
 
         double Ly[B];
@@ -196,20 +315,24 @@ void solve_block_tridiag(
     }
 
     if (!factored[Nx - 1]) {
-        lu_factor(Dd[Nx - 1], piv[Nx - 1]);
+        lu_factor(Dd[Nx - 1], piv[Nx - 1], Nx - 1, "D");
         factored[Nx - 1] = true;
     }
 
     {
         double rhs[B], sol[B];
-        for (int k = 0; k < B; ++k) rhs[k] = Qm[Nx - 1][k];
+        for (int k = 0; k < B; ++k)
+            rhs[k] = Qm[Nx - 1][k];
+
         lu_solve_vec(Dd[Nx - 1], piv[Nx - 1], rhs, sol);
-        for (int k = 0; k < B; ++k) X[Nx - 1][k] = sol[k];
+
+        for (int k = 0; k < B; ++k)
+            X[Nx - 1][k] = sol[k];
     }
 
     for (int i = Nx - 2; i >= 0; --i) {
         if (!factored[i]) {
-            lu_factor(Dd[i], piv[i]);
+            lu_factor(Dd[i], piv[i], i, "D");
             factored[i] = true;
         }
 
@@ -222,16 +345,20 @@ void solve_block_tridiag(
 
         double sol[B];
         lu_solve_vec(Dd[i], piv[i], rhs, sol);
+
         for (int k = 0; k < B; ++k)
             X[i][k] = sol[k];
     }
+
+    // Recover physical variables: x = S * x_hat
+    unscale_solution(X, colScale);
 }
 
 // ========================
 // Sparse helper
 // ========================
-void add(SparseBlock& B, int p, int q, double v) {
-    B.row.push_back(p);
-    B.col.push_back(q);
-    B.val.push_back(v);
+void add(SparseBlock& Bm, int p, int q, double v) {
+    Bm.row.push_back(p);
+    Bm.col.push_back(q);
+    Bm.val.push_back(v);
 }

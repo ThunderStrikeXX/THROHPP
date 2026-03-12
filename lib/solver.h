@@ -41,7 +41,7 @@ void subtract_inplace(DenseBlock& A, const DenseBlock& Bm);
 // ========================
 // LU with partial pivoting
 // ========================
-void lu_factor(DenseBlock& A, std::array<int, B>& piv);
+void lu_factor(DenseBlock& A, std::array<int, B>& piv, int blockIndex, const char* blockName);
 
 void lu_solve_vec(
     const DenseBlock& LU,
