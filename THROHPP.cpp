@@ -106,7 +106,7 @@ int main() {
 
     // Mesh z positions
     std::vector<double> mesh(N, 0.0);
-    for (int i = 0; i < N; ++i) mesh[i] = i * dz;     /// Mesh discretization
+    for (int i = 1; i < N - 1; ++i) mesh[i] = i * dz;     /// Mesh discretization
 
     // State variables definition and initialization
     std::vector<double> rho_m(N, 0.01);                 /// Mixture density [kg/m3]
@@ -882,10 +882,10 @@ int main() {
                     - (rho_m_iter[i] * cv_m_p * T_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    // + p_m_iter[i] * (v_m_iter[i] - v_m_iter[i - 1]) / (2 * dz)
+                    + p_m_iter[i] * (v_m_iter[i + 1] - v_m_iter[i]) / (2 * dz)
 
                     // Pressure II term
-                    // + p_m_iter[i] / dt
+                    + p_m_iter[i] / dt
                 );
 
                 add(D[i], 2, 4, 0.0
@@ -902,7 +902,7 @@ int main() {
                     - (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
+                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 2, 8, 0.0
@@ -952,11 +952,11 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i] / (2 * dz)
-                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i - 1] / (2 * dz)
+                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i + 1] / (2 * dz)
+                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i] / (2 * dz)
 
                     // Pressure II term
-                    // + (p_m_iter[i] * alpha_m_old[i]) / dt
+                    + (p_m_iter[i] * alpha_m_old[i]) / dt
 
                     // Source term
                     // + C50[i]                  // Heat source due to heat flux from wick
@@ -975,13 +975,7 @@ int main() {
                     - (rho_m_iter[i - 1] * cv_m_l * T_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])) / dz
 
                     // Pressure I term
-                    // - p_m_iter[i] * (v_m_iter[i - 1]) / (2 * dz)
-                );
-
-                add(L[i], 2, 6, 0.0
-
-                    // Pressure I term
-                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
+                    - p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
                 );
 
                 add(L[i], 2, 8, 0.0
@@ -1005,10 +999,13 @@ int main() {
                     + (rho_m_iter[i + 1] * cv_m_r * T_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
 
                     // Pressure I term
-                    // + p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
+                    + p_m_iter[i] * (v_m_iter[i + 1]) / (2 * dz)
                 );
 
                 add(R[i], 2, 6, 0.0
+
+                    // Pressure I term
+                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
 
                     // Convective term
                     + (alpha_m_iter[i] * rho_m_iter[i] * cv_m_p * T_m_iter[i] * H(v_m_iter[i + 1])) / dz
@@ -2698,7 +2695,7 @@ int main() {
             const int output_every = 100;
 
             if (n % output_every == 0) {
-                for (int i = 0; i < N; ++i) {
+                for (int i = 1; i < N - 1; ++i) {
 
                     v_velocity_output << X[i][6] << " ";
                     v_pressure_output << X[i][4] << " ";
