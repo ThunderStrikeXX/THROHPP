@@ -6,7 +6,6 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Button, Slider, TextBox
 from io import StringIO
 import textwrap
-from matplotlib.transforms import Bbox
 
 # ============================================================
 # Utils
@@ -40,54 +39,6 @@ def robust_ylim(y_list):
 def time_to_index(time, t):
     return np.searchsorted(time, t, side="left")
 
-def wrap_max_2_lines(text, start_width=20, max_width=60):
-    """
-    Wrappa il testo in modo che occupi al massimo 2 righe.
-    Aumenta la larghezza finché ci riesce.
-    """
-    for w in range(start_width, max_width + 1):
-        lines = textwrap.wrap(text, width=w)
-        if len(lines) <= 2:
-            return "\n".join(lines)
-
-    # fallback: comunque solo 2 righe
-    return "\n".join(textwrap.wrap(text, width=max_width)[:2])
-
-def wrap_max_3_lines_full_text(text, start_width=10, max_width=35):
-    """
-    Trova una larghezza di wrap tale che tutto il testo
-    stia in massimo 3 righe.
-    """
-    for w in range(start_width, max_width + 1):
-        lines = textwrap.wrap(text, width=w)
-        if len(lines) <= 3:
-            return "\n".join(lines)
-    # fallback: ultima possibilità (testo molto lungo)
-    return "\n".join(textwrap.wrap(text, width=max_width))
-
-def fit_text_in_button(button, min_fontsize=5, max_fontsize=9):
-    fig = button.ax.figure
-    label = button.label
-
-    # Forza un primo draw per avere bbox valide
-    fig.canvas.draw()
-
-    ax_bbox = button.ax.get_window_extent()
-
-    for fs in range(max_fontsize, min_fontsize - 1, -1):
-        label.set_fontsize(fs)
-        fig.canvas.draw()
-
-        text_bbox = label.get_window_extent()
-
-        if (text_bbox.width <= ax_bbox.width and
-            text_bbox.height <= ax_bbox.height):
-            return  # trovato font valido
-
-    # fallback estremo
-    label.set_fontsize(min_fontsize)
-
-
 # ============================================================
 # Case selection
 # ============================================================
@@ -96,11 +47,13 @@ root = script_dir
 
 cases = []
 
+# case_* nella cartella corrente
 for d in os.listdir(root):
     full = os.path.join(root, d)
     if os.path.isdir(full) and d.startswith("case_"):
         cases.append(full)
 
+# case_* dentro sottocartelle cases_*
 for d in os.listdir(root):
     parent = os.path.join(root, d)
     if os.path.isdir(parent) and d.startswith("cases_"):
@@ -115,6 +68,11 @@ if not cases:
     print("No case folders found")
     sys.exit(1)
 
+
+if not cases:
+    print("No case folders found")
+    sys.exit(1)
+
 print("Available cases:")
 for i, c in enumerate(cases):
     print(f"{i}: {os.path.relpath(c, root)}")
@@ -122,74 +80,28 @@ for i, c in enumerate(cases):
 sel = input("Select case indices (comma separated): ")
 idxs = [int(i.strip()) for i in sel.split(",")]
 cases_sel = [cases[i] for i in idxs]
-case_labels = [os.path.basename(c).split("case_", 1)[1] for c in cases_sel]
+case_labels = [
+    os.path.basename(c).split("case_", 1)[1]
+    for c in cases_sel
+]
+
 
 # ============================================================
 # Files and metadata
 # ============================================================
 targets = [
-    "vapor_velocity.txt",
-    "vapor_pressure.txt",
-    "vapor_temperature.txt",
-    "rho_vapor.txt",
-    "liquid_velocity.txt",
-    "liquid_pressure.txt",
-    "liquid_temperature.txt",
-    "liquid_rho.txt",
-    "wall_temperature.txt",
-    "vapor_alpha.txt",
-    "liquid_alpha.txt",
-    "gamma_xv.txt",
-    "phi_xv.txt",
-    "heat_source_wall_liquid_flux.txt",
-    "heat_source_liquid_wall_flux.txt",
-    "heat_source_vapor_liquid_phase.txt",
-    "heat_source_liquid_vapor_phase.txt",
-    "heat_source_vapor_liquid_flux.txt",
-    "heat_source_liquid_vapor_flux.txt",
-    "p_saturation.txt",
-    "T_sur.txt",
-    "delta_p_capillary.txt",
-    "q_pp.txt"
+    "interface_wx_balance.txt",
+    "interface_xv_balance.txt",
 ]
 
 names = [
-    "Vapor velocity",
-    "Vapor pressure",
-    "Vapor temperature",
-    "Vapor density",
-    "Liquid velocity",
-    "Liquid pressure",
-    "Liquid temperature",
-    "Liquid density",
-    "Wall temperature",
-    "Vapor volume fraction",
-    "Liquid volume fraction",
-    "Mass transfer coefficient (gamma_xv)",
-    "Mass flux (phi_xv)",
-    "Heat flux from wall to liquid",
-    "Heat flux from liquid to wall",
-    "Heat source from vapor to liquid due to phase change",
-    "Heat source from liquid to vapor due to phase change",
-    "Heat flux from vapor to liquid",
-    "Heat flux from liquid to vapor",
-    "Saturation pressure",
-    "Interface temperature (T_sur)",
-    "Capillary pressure drop",
-    "Applied heat flux q_pp"
+    "Heat volumetric balance \n at the wall/liquid interface",
+    "Heat volumetric balance \n at the liquid/vapor interface",
 ]
 
 units = [
-    "[m/s]", "[Pa]", "[K]", "[kg/m³]",
-    "[m/s]", "[Pa]", "[K]", "[kg/m³]",
-    "[K]",
-    "[-]", "[-]",
-    "[kg/(m³·s)]", "[kg/(m²·s)]",
-    "[W/m²]", "[W/m²]",
-    "[W/m³]", "[W/m³]",
-    "[W/m²]", "[W/m²]",
-    "[Pa]", "[K]",
-    "[Pa]", "[W/m²]"
+    "[W/m3]", 
+    "[W/m3]"
 ]
 
 # ============================================================
@@ -197,18 +109,21 @@ units = [
 # ============================================================
 X = []
 TIME = None
-Y = []
+Y = []   # Y[var][case]
 
 for c in cases_sel:
     x = safe_loadtxt(os.path.join(c, "mesh.txt"))
     t = safe_loadtxt(os.path.join(c, "time.txt"))
 
     X.append(x)
+
     if TIME is None:
         TIME = t
 
-    Y.append([safe_loadtxt(os.path.join(c, f)) for f in targets])
+    y_case = [safe_loadtxt(os.path.join(c, f)) for f in targets]
+    Y.append(y_case)
 
+# transpose -> Y[var][case]
 Y = list(map(list, zip(*Y)))
 
 n_cases = len(cases_sel)
@@ -218,58 +133,34 @@ n_frames = len(TIME)
 # Figure
 # ============================================================
 fig, ax = plt.subplots(figsize=(11, 6))
-plt.subplots_adjust(left=0.12, bottom=0.25, right=0.60, top=0.92)
-
-y_label_top = fig.text(
-    0.36, 0.985,
-    "",
-    ha="center", va="top",
-    fontsize=11
-)
-
-
-# Colormap moderna (NO deprecation)
-cmap = plt.colormaps["tab20"]
+plt.subplots_adjust(left=0.08, bottom=0.25, right=0.60)
 
 lines = []
-
 for i in range(n_cases):
-
-    color = cmap(i % cmap.N)   # evita overflow se >20 casi
-
-    (ln,) = ax.plot(
-        [],
-        [],
-        lw=2.0,
-        linestyle='-',
-        marker='o',
-        markersize=4,
-        color=color,
-        label=case_labels[i]
-    )
-
+    (ln,) = ax.plot([], [], lw=2, marker='o', markersize=3,
+                    label=case_labels[i])
     lines.append(ln)
 
 ax.grid(True)
 ax.set_xlabel("Axial length [m]")
-ax.tick_params(axis='both', labelsize=9)
+ax.legend()
 
 # Slider
-ax_slider = plt.axes([0.12, 0.10, 0.46, 0.03])
+ax_slider = plt.axes([0.08, 0.10, 0.50, 0.03])
 slider = Slider(ax_slider, "Time [s]", TIME.min(), TIME.max(), valinit=TIME[0])
 
 # Timebox
 ax_timebox = plt.axes([0.70, 0.09, 0.15, 0.05])
-time_box = TextBox(ax_timebox, "Set t [s]", initial=f"{TIME[0]:.6g}")
+time_box = TextBox(ax_timebox, "Set t [s] ", initial=f"{TIME[0]:.6g}")
 
 # ============================================================
-# Variable buttons (FIXED: wrapping + font)
+# Variable buttons
 # ============================================================
 buttons = []
 n_vars = len(names)
-n_cols = 3
-button_width = 0.11
-button_height = 0.07
+n_cols = 1
+button_width = 0.18
+button_height = 0.12
 col_gap = 0.005
 
 panel_left = 0.62
@@ -283,15 +174,9 @@ for i, name in enumerate(names):
     row = i // n_cols
     x_pos = panel_left + col * (button_width + col_gap)
     y_pos = panel_top - (row + 1) * row_height
-
     bax = plt.axes([x_pos, y_pos, button_width, button_height])
-    wrapped = wrap_max_3_lines_full_text(name, start_width=10, max_width=30)
-
-    btn = Button(bax, wrapped)
-    btn.label.set_multialignment("center")
-
-    fit_text_in_button(btn, min_fontsize=5, max_fontsize=9)
-
+    btn = Button(bax, name)
+    btn.label.set_fontsize(9)
     buttons.append(btn)
 
 # ============================================================
@@ -302,18 +187,17 @@ current_frame = [0]
 running = [False]
 updating = [False]
 
-ax.set_xlim(min(x.min() for x in X), max(x.max() for x in X))
+ax.set_title(f"{names[current_var]} {units[current_var]}")
+xmin = min(x.min() for x in X)
+xmax = max(x.max() for x in X)
+ax.set_xlim(xmin, xmax)
 ax.set_ylim(*robust_ylim(Y[current_var]))
-
-y_label_top.set_text(
-    wrap_max_2_lines(f"{names[current_var]} {units[current_var]}")
-)
-
 
 # ============================================================
 # Drawing
 # ============================================================
 def draw_frame(i, update_slider=True):
+
     for c in range(n_cases):
         y = Y[current_var][c]
         if y.ndim > 1:
@@ -324,7 +208,9 @@ def draw_frame(i, update_slider=True):
 
     if update_slider:
         slider.disconnect(slider_cid)
-        slider.set_val(TIME[min(i, len(TIME) - 1)])
+
+        if len(TIME) > 0:
+            slider.set_val(TIME[min(i, len(TIME) - 1)])
         connect_slider()
 
     return lines
@@ -367,20 +253,21 @@ def connect_slider():
     slider_cid = slider.on_changed(slider_update)
 
 connect_slider()
+
 time_box.on_submit(submit_time)
 
 # ============================================================
-# Variable change (FIXED y-label)
+# Variable change
 # ============================================================
 def change_variable(idx):
     global current_var
     current_var = idx
-    y_label_top.set_text(
-        wrap_max_2_lines(f"{names[idx]} {units[idx]}")
-    )
+    ax.set_title(f"{names[idx]} {units[idx]}")
+
 
     ax.set_ylim(*robust_ylim(Y[idx]))
     ax.legend(handles=lines, loc='best')
+
     current_frame[0] = 0
     draw_frame(0)
 
@@ -390,24 +277,27 @@ for i, btn in enumerate(buttons):
 # ============================================================
 # Controls
 # ============================================================
-ax_play  = plt.axes([0.15, 0.02, 0.10, 0.05])
+ax_play = plt.axes([0.15, 0.02, 0.10, 0.05])
 ax_pause = plt.axes([0.27, 0.02, 0.10, 0.05])
 ax_reset = plt.axes([0.39, 0.02, 0.10, 0.05])
-ax_save  = plt.axes([0.51, 0.02, 0.10, 0.05])
+ax_save = plt.axes([0.51, 0.02, 0.10, 0.05])
 
-btn_play  = Button(ax_play, "Play")
+btn_play = Button(ax_play, "Play")
 btn_pause = Button(ax_pause, "Pause")
 btn_reset = Button(ax_reset, "Reset")
-btn_save  = Button(ax_save, "Save")
+btn_save = Button(ax_save, "Save")
 
 def play(event):
     ani.event_source.start()
+    running[0] = True
 
 def pause(event):
     ani.event_source.stop()
+    running[0] = False
 
 def reset(event):
     ani.event_source.stop()
+    running[0] = False
     current_frame[0] = 0
     draw_frame(0)
     slider.set_val(TIME[0])
@@ -416,20 +306,13 @@ def reset(event):
 
 def save_plot(event):
     fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
 
     # bounding box dell'axes
-    bbox_ax = ax.get_tightbbox(renderer)
-
-    # bounding box della y-label (fig.text)
-    bbox_label = y_label_top.get_window_extent(renderer)
-
-    # UNIONE CORRETTA dei bounding box
-    bbox = Bbox.union([bbox_ax, bbox_label])
-
+    bbox = ax.get_tightbbox(fig.canvas.get_renderer())
     bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
 
     desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
     filename = os.path.join(
         desktop,
         f"{names[current_var].replace(' ', '_')}.png"
@@ -443,7 +326,6 @@ def save_plot(event):
     )
 
     print(f"Saved on Desktop: {filename}")
-
 
 btn_play.on_clicked(play)
 btn_pause.on_clicked(pause)
@@ -464,8 +346,12 @@ ani = FuncAnimation(
     repeat=True
 )
 
+# force start in paused state
 ani.event_source.stop()
+running[0] = False
+current_frame[0] = 0
 draw_frame(0)
+
 change_variable(current_var)
 
 plt.show()

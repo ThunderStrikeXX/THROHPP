@@ -97,6 +97,129 @@ static double block_max_abs(const DenseBlock& A) {
 }
 
 // ========================
+// Row normalization
+// ========================
+static void normalize_full_block_row(
+    DenseBlock* Lp,
+    DenseBlock& D,
+    DenseBlock* Rp,
+    VecBlock& q,
+    double tol = 0.0) {
+    for (int r = 0; r < B; ++r) {
+        double rowMax = 0.0;
+
+        if (Lp) {
+            for (int c = 0; c < B; ++c)
+                rowMax = std::max(rowMax, std::fabs((*Lp)[r][c]));
+        }
+
+        for (int c = 0; c < B; ++c)
+            rowMax = std::max(rowMax, std::fabs(D[r][c]));
+
+        if (Rp) {
+            for (int c = 0; c < B; ++c)
+                rowMax = std::max(rowMax, std::fabs((*Rp)[r][c]));
+        }
+
+        if (rowMax <= tol) {
+            if (std::fabs(q[r]) > tol) {
+                std::ostringstream oss;
+                oss << "Row normalization failed: null full block-row with non-zero RHS.\n"
+                    << "Local row index = " << r << '\n'
+                    << "RHS value       = " << q[r] << '\n'
+                    << "L block row:\n";
+                if (Lp) {
+                    for (int c = 0; c < B; ++c) oss << std::setw(24) << (*Lp)[r][c] << ' ';
+                }
+                else {
+                    oss << "(none)";
+                }
+                oss << "\nD block row:\n";
+                for (int c = 0; c < B; ++c) oss << std::setw(24) << D[r][c] << ' ';
+                oss << "\nR block row:\n";
+                if (Rp) {
+                    for (int c = 0; c < B; ++c) oss << std::setw(24) << (*Rp)[r][c] << ' ';
+                }
+                else {
+                    oss << "(none)";
+                }
+                oss << '\n';
+
+                std::cerr << oss.str() << std::endl;
+                throw std::runtime_error("Row normalization failed");
+            }
+            continue;
+        }
+
+        if (Lp) {
+            for (int c = 0; c < B; ++c)
+                (*Lp)[r][c] /= rowMax;
+        }
+
+        for (int c = 0; c < B; ++c)
+            D[r][c] /= rowMax;
+
+        if (Rp) {
+            for (int c = 0; c < B; ++c)
+                (*Rp)[r][c] /= rowMax;
+        }
+
+        q[r] /= rowMax;
+    }
+}
+
+static void normalize_reduced_block_row(
+    DenseBlock& D,
+    DenseBlock* Rp,
+    VecBlock& q,
+    double tol = 0.0) {
+    for (int r = 0; r < B; ++r) {
+        double rowMax = 0.0;
+
+        for (int c = 0; c < B; ++c)
+            rowMax = std::max(rowMax, std::fabs(D[r][c]));
+
+        if (Rp) {
+            for (int c = 0; c < B; ++c)
+                rowMax = std::max(rowMax, std::fabs((*Rp)[r][c]));
+        }
+
+        if (rowMax <= tol) {
+            if (std::fabs(q[r]) > tol) {
+                std::ostringstream oss;
+                oss << "Reduced row normalization failed: null row with non-zero RHS.\n"
+                    << "Local row index = " << r << '\n'
+                    << "RHS value       = " << q[r] << '\n'
+                    << "D block row:\n";
+                for (int c = 0; c < B; ++c) oss << std::setw(24) << D[r][c] << ' ';
+                oss << "\nR block row:\n";
+                if (Rp) {
+                    for (int c = 0; c < B; ++c) oss << std::setw(24) << (*Rp)[r][c] << ' ';
+                }
+                else {
+                    oss << "(none)";
+                }
+                oss << '\n';
+
+                std::cerr << oss.str() << std::endl;
+                throw std::runtime_error("Row normalization failed");
+            }
+            continue;
+        }
+
+        for (int c = 0; c < B; ++c)
+            D[r][c] /= rowMax;
+
+        if (Rp) {
+            for (int c = 0; c < B; ++c)
+                (*Rp)[r][c] /= rowMax;
+        }
+
+        q[r] /= rowMax;
+    }
+}
+
+// ========================
 // Column scaling
 // ========================
 static std::array<double, B> compute_column_scaling(
@@ -277,12 +400,20 @@ void solve_block_tridiag(
         if (i < Nx - 1) Rd[i] = to_dense(R[i]);
     }
 
-    // Global column scaling for all local variables
-    const std::array<double, B> colScale = compute_column_scaling(Ld, Dd, Rd);
-    apply_column_scaling_to_system(Ld, Dd, Rd, colScale);
-
     std::vector<VecBlock> Qm = Q;
     X.assign(Nx, VecBlock{});
+
+    // 1) Correct row normalization on the full block-rows:
+    //    L[i] x_{i-1} + D[i] x_i + R[i] x_{i+1} = Q[i]
+    for (int i = 0; i < Nx; ++i) {
+        DenseBlock* Lp = (i > 0) ? &Ld[i] : nullptr;
+        DenseBlock* Rp = (i < Nx - 1) ? &Rd[i] : nullptr;
+        normalize_full_block_row(Lp, Dd[i], Rp, Qm[i]);
+    }
+
+    // 2) Global column scaling for all local variables
+    const std::array<double, B> colScale = compute_column_scaling(Ld, Dd, Rd);
+    apply_column_scaling_to_system(Ld, Dd, Rd, colScale);
 
     std::vector<std::array<int, B>> piv(Nx);
     std::vector<bool> factored(Nx, false);
@@ -312,6 +443,11 @@ void solve_block_tridiag(
         matvec(Ld[i], y, Ly);
         for (int k = 0; k < B; ++k)
             Qm[i][k] -= Ly[k];
+
+        // After forward elimination, the reduced block-row is:
+        // D[i] x_i + R[i] x_{i+1} = Q[i]
+        DenseBlock* Rp = (i < Nx - 1) ? &Rd[i] : nullptr;
+        normalize_reduced_block_row(Dd[i], Rp, Qm[i]);
     }
 
     if (!factored[Nx - 1]) {

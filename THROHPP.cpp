@@ -4,7 +4,6 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-#include <omp.h>
 #include <array>
 #include <algorithm>
 #include <cstddef>
@@ -49,7 +48,7 @@ int main() {
     const double sigma_c = 0.05;            /// Condensation accomodation coefficient [-]. 1 means optimal condensation
 
     // Geometric parameters
-    const int N = 8;                                                           /// Number of axial nodes [-]
+    const int N = 16;                                                           /// Number of axial nodes [-]
     const double l = 0.982; 			                                        /// Length of the heat pipe [m]
     const double dz = l / (N - 2);                                                    /// Axial discretization step [m]
     const double evaporator_length = 0.502;                                     /// Evaporator length [m]
@@ -65,6 +64,9 @@ int main() {
     const double V_liquid = dz * M_PI * (r_i * r_i - r_v * r_v);                /// Volume of the liquid cell [m3]
     const double V_vapor = dz * M_PI * r_v * r_v;                               /// Volume of the vapor cell [m3]
     const double lateral_surface = dz * 2 * M_PI * r_o;                         /// Lateral outer surface [m2]
+    const double Dh_v = 2.0 * r_v;                                              /// Hydraulic diameter of the vapor core [m]
+    double Omega = 1.0;
+    const double Kgeom = 2.0 * r_v * eps_s / (r_i * r_i);
 
     // Constant geometrical parameters for the radial model
     const double Eio1 = 2.0 / 3.0 * (r_o + r_i - 1 / (1 / r_o + 1 / r_i));
@@ -81,8 +83,10 @@ int main() {
     // Time-stepping parameters
     double dt_user = 1e-3;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
-    const int tot_iter = 1e8;                           /// Number of timesteps [-]
+    double time_simulation = 5000;                      // 
     double time_total = 0.0;                            /// Total time elapsed [s]
+    double t_last_print = 0.0;
+    double print_interval = 0.001;
     int halves = 0;                                     /// Number of times the time step has been halved [-]
 
     // Picard loops parameters	          
@@ -225,7 +229,11 @@ int main() {
 
     // Print results in file
     std::ofstream mesh_output(name + "/mesh.txt", std::ios::trunc);
-    std::ofstream time_output(name + "/time.txt", std::ios::trunc);
+
+    std::ofstream time_output(name + "/time.txt", std::ios::app);
+    std::ofstream dt_output(name + "/dt.txt", std::ios::app);
+    std::ofstream simulation_time_output(name + "/simulation_time.txt", std::ios::app);
+    std::ofstream clock_time_output(name + "/clock_time.txt", std::ios::app);
 
     std::ofstream v_velocity_output(name + "/vapor_velocity.txt", std::ios::trunc);
     std::ofstream v_pressure_output(name + "/vapor_pressure.txt", std::ios::trunc);
@@ -255,6 +263,27 @@ int main() {
 
 	std::ofstream dpcap_output(name + "/delta_p_capillary.txt", std::ios::trunc);
 	std::ofstream q_pp_output(name + "/q_pp.txt", std::ios::trunc);
+
+    std::ofstream acc_mass_v_output(name + "/acc_mass_v.txt", std::ios::trunc);
+    std::ofstream acc_mass_l_output(name + "/acc_mass_l.txt", std::ios::trunc);
+
+    std::ofstream acc_energy_v_output(name + "/acc_energy_v.txt", std::ios::trunc);
+    std::ofstream acc_energy_l_output(name + "/acc_energy_l.txt", std::ios::trunc);
+
+    std::ofstream acc_mom_v_output(name + "/acc_mom_v.txt", std::ios::trunc);
+    std::ofstream acc_mom_l_output(name + "/acc_mom_l.txt", std::ios::trunc);
+
+    std::ofstream total_mass_balance_v_output(name + "/total_mass_balance_v.txt", std::ios::trunc);
+    std::ofstream total_mass_balance_l_output(name + "/total_mass_balance_l.txt", std::ios::trunc);
+
+    std::ofstream total_heat_balance_v_output(name + "/total_heat_balance_v.txt", std::ios::trunc);
+    std::ofstream total_heat_balance_l_output(name + "/total_heat_balance_l.txt", std::ios::trunc);
+
+    std::ofstream global_heat_balance_output(name + "/global_heat_balance.txt", std::ios::trunc);
+    std::ofstream total_heat_balance_w_output(name + "/total_heat_balance_w.txt", std::ios::trunc);
+
+    std::ofstream interface_wx_balance_output(name + "/interface_wx_balance.txt", std::ios::trunc);
+    std::ofstream interface_xv_balance_output(name + "/interface_xv_balance.txt", std::ios::trunc);
 
     const int global_precision = 8;
 
@@ -288,8 +317,28 @@ int main() {
     tsur_output << std::setprecision(global_precision);
 
 	dpcap_output << std::setprecision(global_precision);
-
 	q_pp_output << std::setprecision(global_precision);
+
+    acc_mass_v_output << std::setprecision(global_precision);
+    acc_mass_l_output << std::setprecision(global_precision);
+
+    acc_energy_v_output << std::setprecision(global_precision);
+    acc_energy_l_output << std::setprecision(global_precision);
+
+    acc_mom_v_output << std::setprecision(global_precision);
+    acc_mom_l_output << std::setprecision(global_precision);
+
+    total_mass_balance_v_output << std::setprecision(global_precision);
+    total_mass_balance_l_output << std::setprecision(global_precision);
+
+    total_heat_balance_v_output << std::setprecision(global_precision);
+    total_heat_balance_l_output << std::setprecision(global_precision);
+
+    global_heat_balance_output << std::setprecision(global_precision);
+    total_heat_balance_w_output << std::setprecision(global_precision);
+
+    interface_wx_balance_output << std::setprecision(global_precision);
+    interface_xv_balance_output << std::setprecision(global_precision);
 
     for (int i = 0; i < N - 2; ++i) mesh_output << mesh[i] << " ";
 
@@ -318,7 +367,6 @@ int main() {
         , C52(N, 0.0), C53(N, 0.0), C54(N, 0.0), C55(N, 0.0), C56(N, 0.0), C57(N, 0.0), C58(N, 0.0), C59(N, 0.0), C60(N, 0.0), C61(N, 0.0), C62(N, 0.0), C63(N, 0.0), C64(N, 0.0)
         , C65(N, 0.0), C66(N, 0.0), C67(N, 0.0), C68(N, 0.0), C69(N, 0.0), C70(N, 0.0), C71(N, 0.0), C72(N, 0.0), C73(N, 0.0), C74(N, 0.0), C75(N, 0.0);
 
-    std::vector<double> k_x(N, 0.0);
     std::vector<double> H_xm(N, 0.0);
     std::vector<double> Dh(N, 0.0);
 
@@ -368,8 +416,6 @@ int main() {
     std::vector<double> Ex7(N, 0.0);
     std::vector<double> Ex8(N, 0.0);
 
-    std::vector<double> k_w(N, 0.0);
-
     std::vector<double> heat_balance_xv_full(N, 0.0);
 
     std::vector<double> conduction_err(N, 0.0);
@@ -382,18 +428,68 @@ int main() {
 
     std::vector<double> pressure_work_m(N, 0.0);
 
+    std::vector<double> cp_m(N, 0.0);
+    std::vector<double> cp_m_old(N, 0.0);
+
+    std::vector<double> cp_l(N, 0.0);
+    std::vector<double> cp_l_old(N, 0.0);
+
+    std::vector<double> cp_w(N, 0.0);
+    std::vector<double> cp_w_old(N, 0.0);
+
+    std::vector<double> k_m(N, 0.0);
+    std::vector<double> k_l(N, 0.0);
+
+    std::vector<double> k_w(N, 0.0);
+
+    std::vector<double> mu_l(N, 0.0);
+    std::vector<double> mu_m(N, 0.0);
+
+    std::vector<double> Re_v(N, 0.0);
+    std::vector<double> Pr_v(N, 0.0);
+
+    std::vector<double> dPsat_dT(N, 0.0);
+
     #pragma endregion
 
-    /// Print number of working threads
-    std::cout << "Threads: " << omp_get_max_threads() << "\n";
-
-    double start = omp_get_wtime();
+    // Start computational time measurement of whole simulation
+    auto t_start_simulation = std::chrono::high_resolution_clock::now();
 
     // Time-stepping loop
-    for (int n = 0; n < tot_iter; ++n) {
+    while (time_total < time_simulation) {
+
+        // Start computational time iteration
+        auto t_start_timestep = std::chrono::high_resolution_clock::now();
 
         // Timestep selection
         dt = std::max(dt_user * pow(0.5, halves), 1e-10);    // Halfing of the timestep up to a lower bound     
+
+        // Updating all properties
+        for (std::size_t i = 0; i < N; ++i) {
+
+            cp_w[i] = steel::cp(T_w[i]);
+            k_w[i] = steel::k(T_w[i]);
+
+            cp_l[i] = liquid_sodium::cp_l_linear();
+            k_l[i] = liquid_sodium::k(T_l[i]);
+            mu_l[i] = liquid_sodium::mu(T_l[i]);
+
+            cp_m[i] = vapor_sodium::cp_g_linear();
+            k_m[i] = vapor_sodium::k(T_m[i], p_m[i]);
+            mu_m[i] = liquid_sodium::mu(T_m[i]);
+
+            // Update heat fluxes at the interfaces
+            if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;       /// Evaporator imposed heat flux [W/m2]
+            else if (i >= (N - condenser_nodes)) {
+
+                double conv = h_conv *
+                    (T_w_iter[i] - T_env);                              /// Condenser convective heat flux [W/m2]
+                double irr = emissivity * sigma *
+                    (std::pow(T_w_iter[i], 4) - std::pow(T_env, 4));    /// Condenser irradiation heat flux [W/m2]
+
+                q_pp[i] = -(conv + irr);                                /// Heat flux at the outer wall [W/m2] (positive if to the wall) 
+            }
+        }
 
         // Picard iteration loop
         for (pic = 0; pic < max_picard; ++pic) {
@@ -444,32 +540,18 @@ int main() {
                 #pragma region coefficients
 
                 // Physical properties
-                k_w[i] = steel::k(T_w_iter[i]);                                   /// Wall thermal conductivity [W/(m K)]
-                k_x[i] = liquid_sodium::k(T_l_iter[i]);                           /// Liquid thermal conductivity [W/(m K)]
-                const double k_m = vapor_sodium::k(T_m_iter[i], p_m_iter[i]);               /// Vapor thermal conductivity [W/(m K)]
-                const double cp_m = vapor_sodium::cp_g_linear();                            /// Vapor specific heat [J/(kg K)]
-                const double mu_v = vapor_sodium::mu(T_m_iter[i]);                          /// Vapor dynamic viscosity [Pa*s]
-                const double mu_l = liquid_sodium::mu(T_l_iter[i]);                         /// Liquid dynamic viscosity
-                const double Dh_v = 2.0 * r_v;                                              /// Hydraulic diameter of the vapor core [m]
-                const double Re_v = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_v;   /// Reynolds number [-]
-                const double Pr_v = cp_m * mu_v / k_m;                                      /// Prandtl number [-]
-                // const double H_xm = vapor_sodium::h_conv(Re_v, Pr_v, k_m, Dh_v);            /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                H_xm[i] = (k_x[i] / Dh_v) * (5.0 + 0.66 * std::pow(std::abs(v_l[i]), 0.8));
-                p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                       /// Saturation pressure [Pa]         
-                const double dPsat_dT = vapor_sodium::dP_sat_dT(T_sur_iter[i]);             /// Derivative of the saturation pressure wrt T [Pa/K]   
-
-                double Omega = 1.0;
-                const double Kgeom = 2.0 * r_v * eps_s / (r_i * r_i);
+                Re_v[i] = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_m[i];              /// Reynolds number [-]
+                Pr_v[i] = cp_m[i] * mu_m[i] / k_m[i];                                                 /// Prandtl number [-] 
+                H_xm[i] = (k_l[i] / Dh_v) * (5.0 + 0.66 * std::pow(std::abs(v_l[i]), 0.8));     /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                           /// Saturation pressure [Pa]         
+                dPsat_dT[i] = vapor_sodium::dP_sat_dT(T_sur_iter[i]);                           /// Derivative of the saturation pressure wrt T [Pa/K]   
 
                 // Gamma coefficients definition (everything is calculated using iter (k-iteration) values)
 
                 const double beta = 1.0 / std::sqrt(2.0 * M_PI * Rv * T_sur_iter[i]);
 
-                const double Psat = vapor_sodium::P_sat(T_sur_iter[i]);
-                const double dPsat = vapor_sodium::dP_sat_dT(T_sur_iter[i]);
-
                 cGamma[i] = - (Kgeom * beta * sigma_c);
-                bGamma[i] = - (Gamma_xv[i] / (2 * T_sur_iter[i])) + (Kgeom * beta * sigma_e * dPsat);
+                bGamma[i] = - (Gamma_xv[i] / (2 * T_sur_iter[i])) + (Kgeom * beta * sigma_e * dPsat_dT[i]);
                 aGamma[i] = Gamma_xv[i] - bGamma[i] * T_sur_iter[i];
 
                 Gamma_xv[i] = Kgeom * (sigma_e * p_saturation[i] - sigma_c * 1.0 * p_m_iter[i]);
@@ -494,8 +576,8 @@ int main() {
 
                 // Radial model constants
                 Ex3[i] = - H_xm[i] - (Dh[i] * r_i * r_i) / (2.0 * r_v) * bGamma[i];
-                Ex4[i] = k_x[i] - H_xm[i] * r_v - (Dh[i] * r_i * r_i) / (2.0 * r_v) * bGamma[i] * r_v;
-                Ex5[i] = 2.0 * r_v * k_x[i] - H_xm[i] * r_v * r_v - (Dh[i] * r_i * r_i) / (2.0 * r_v) * bGamma[i] * (r_v * r_v);
+                Ex4[i] = k_l[i] - H_xm[i] * r_v - (Dh[i] * r_i * r_i) / (2.0 * r_v) * bGamma[i] * r_v;
+                Ex5[i] = 2.0 * r_v * k_l[i] - H_xm[i] * r_v * r_v - (Dh[i] * r_i * r_i) / (2.0 * r_v) * bGamma[i] * (r_v * r_v);
                 Ex6[i] = -H_xm[i];
                 Ex7[i] = (Dh[i] * r_i * r_i) / (2.0 * r_v) * cGamma[i];
                 Ex8[i] = (Dh[i] * r_i * r_i) / (2.0 * r_v) * (aGamma[i] - cGamma[i] * p_m_iter[i]);
@@ -507,11 +589,11 @@ int main() {
                 alpha5[i] = 2 * r_i * Evi1 - Evi2;
                 alpha6[i] = r_i - Evi1;
                 alpha7[i] = alpha5[i] - r_i * r_i;
-                alpha8[i] = alpha2[i] - alpha4[i] * alpha6[i] / k_x[i];
-                alpha9[i] = alpha6[i] / k_x[i] - alpha3[i] / k_w[i];
-                alpha10[i] = alpha4[i] * (Ex4[i] - Ex3[i] * Evi1) / k_x[i];
+                alpha8[i] = alpha2[i] - alpha4[i] * alpha6[i] / k_l[i];
+                alpha9[i] = alpha6[i] / k_l[i] - alpha3[i] / k_w[i];
+                alpha10[i] = alpha4[i] * (Ex4[i] - Ex3[i] * Evi1) / k_l[i];
                 alpha11[i] = Ex3[i] * alpha5[i] - 2 * r_i * Ex4[i] + Ex5[i];
-                alpha12[i] = (Ex4[i] - Ex3[i] * Evi1) / k_x[i];
+                alpha12[i] = (Ex4[i] - Ex3[i] * Evi1) / k_l[i];
 
                 delta[i] = alpha8[i] * alpha11[i] + alpha7[i] * alpha10[i];
 
@@ -544,18 +626,18 @@ int main() {
                 C20[i] = -Eio1 * q_pp[i] / k_w[i] + alpha1[i] * C5[i];
 
                 // b_x coefficients
-                C21[i] = alpha4[i] * C1[i] / k_x[i] - 2.0 * r_i * C6[i];
-                C22[i] = alpha4[i] * C2[i] / k_x[i] - 2.0 * r_i * C7[i];
-                C23[i] = alpha4[i] * C3[i] / k_x[i] - 2.0 * r_i * C8[i];
-                C24[i] = alpha4[i] * C4[i] / k_x[i] - 2.0 * r_i * C9[i];
-                C25[i] = q_pp[i] / k_x[i] + alpha4[i] * C5[i] / k_x[i] - 2.0 * r_i * C10[i];
+                C21[i] = alpha4[i] * C1[i] / k_l[i] - 2.0 * r_i * C6[i];
+                C22[i] = alpha4[i] * C2[i] / k_l[i] - 2.0 * r_i * C7[i];
+                C23[i] = alpha4[i] * C3[i] / k_l[i] - 2.0 * r_i * C8[i];
+                C24[i] = alpha4[i] * C4[i] / k_l[i] - 2.0 * r_i * C9[i];
+                C25[i] = q_pp[i] / k_l[i] + alpha4[i] * C5[i] / k_l[i] - 2.0 * r_i * C10[i];
 
                 // a_x coefficients
-                C26[i] = -Evi1 * alpha4[i] / k_x[i] * C1[i] + alpha5[i] * C6[i];
-                C27[i] = -Evi1 * alpha4[i] / k_x[i] * C2[i] + alpha5[i] * C7[i];
-                C28[i] = 1.0 - Evi1 * alpha4[i] / k_x[i] * C3[i] + alpha5[i] * C8[i];
-                C29[i] = -Evi1 * alpha4[i] / k_x[i] * C4[i] + alpha5[i] * C9[i];
-                C30[i] = -Evi1 * q_pp[i] / k_x[i] - Evi1 * alpha4[i] / k_x[i] * C5[i] + alpha5[i] * C10[i];
+                C26[i] = -Evi1 * alpha4[i] / k_l[i] * C1[i] + alpha5[i] * C6[i];
+                C27[i] = -Evi1 * alpha4[i] / k_l[i] * C2[i] + alpha5[i] * C7[i];
+                C28[i] = 1.0 - Evi1 * alpha4[i] / k_l[i] * C3[i] + alpha5[i] * C8[i];
+                C29[i] = -Evi1 * alpha4[i] / k_l[i] * C4[i] + alpha5[i] * C9[i];
+                C30[i] = -Evi1 * q_pp[i] / k_l[i] - Evi1 * alpha4[i] / k_l[i] * C5[i] + alpha5[i] * C10[i];
 
                 // T_sur coefficients [checked]
                 C31[i] = C26[i] + r_v * C21[i] + r_v * r_v * C6[i];
@@ -572,11 +654,11 @@ int main() {
                 C40[i] = bGamma[i] * C35[i] - cGamma[i] * p_m_iter[i] + aGamma[i];
                     
                 // Heat source from mixture to liquid due to heat flux coefficients
-                C41[i] = -2 * k_x[i] * r_v / (r_i * r_i) * (C21[i] + 2 * r_v * C6[i]);
-                C42[i] = -2 * k_x[i] * r_v / (r_i * r_i) * (C22[i] + 2 * r_v * C7[i]);
-                C43[i] = -2 * k_x[i] * r_v / (r_i * r_i) * (C23[i] + 2 * r_v * C8[i]);
-                C44[i] = -2 * k_x[i] * r_v / (r_i * r_i) * (C24[i] + 2 * r_v * C9[i]);
-                C45[i] = -2 * k_x[i] * r_v / (r_i * r_i) * (C25[i] + 2 * r_v * C10[i]);
+                C41[i] = -2 * k_l[i] * r_v / (r_i * r_i) * (C21[i] + 2 * r_v * C6[i]);
+                C42[i] = -2 * k_l[i] * r_v / (r_i * r_i) * (C22[i] + 2 * r_v * C7[i]);
+                C43[i] = -2 * k_l[i] * r_v / (r_i * r_i) * (C23[i] + 2 * r_v * C8[i]);
+                C44[i] = -2 * k_l[i] * r_v / (r_i * r_i) * (C24[i] + 2 * r_v * C9[i]);
+                C45[i] = -2 * k_l[i] * r_v / (r_i * r_i) * (C25[i] + 2 * r_v * C10[i]);
 
                 // Heat source from liquid to mixture due to heat flux coefficients
                 C46[i] = 2 * H_xm[i] * r_v / (r_i * r_i) * (C26[i] + C21[i] * r_v + C6[i] * r_v * r_v);
@@ -1245,7 +1327,7 @@ int main() {
                 Q[i][4] = 0.0
 
                     // Source term 
-                    // + q_pp[i] * 2 * r_o / (r_o * r_o - r_i * r_i)
+                    + q_pp[i] * 2 * r_o / (r_o * r_o - r_i * r_i)
 
                     // Temporal term
                     + (rho_w_p * cp_w_p * T_w_old[i]) / dt
@@ -1268,7 +1350,7 @@ int main() {
 
                 // -------- MOMENTUM MIXTURE EQUATION ---------
 
-                const double Re = rho_m_iter[i] * std::abs(v_m_iter[i]) * Dh_v / mu_v;
+                const double Re = rho_m_iter[i] * std::abs(v_m_iter[i]) * Dh_v / mu_m[i];
                 const double fm = Re > 1187.4 ? 0.3164 * std::pow(Re, -0.25) : 64 * std::pow(Re, -1);
 
                 add(D[i], 5, 0,
@@ -1370,7 +1452,7 @@ int main() {
 
                 // ------ MOMENTUM LIQUID EQUATION ------
 
-                const double Fl = 8 * mu_l / (eps_v * (r_i - r_v) * (r_i - r_v));
+                const double Fl = 8 * mu_l[i] / (eps_v * (r_i - r_v) * (r_i - r_v));
 
                 add(D[i], 6, 1,
 
@@ -1392,13 +1474,13 @@ int main() {
                     + eps_v * ((1 - H(v_l_iter[i])) * rho_l_iter[i] * v_l_iter[i + 1] * v_l_iter[i + 1]) / dz
 
                     // Capillary term (central differences)
-                    // - (DPcap[i] + DPcap[i + 1]) / (2 * dz)
+                    - (DPcap[i] + DPcap[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 6, 5, 0.0
 
                     // Pressure term (central differences)
-                    +eps_v * (alpha_l_iter[i - 1] + alpha_l_iter[i]) / (2 * dz)
+                    + eps_v * (alpha_l_iter[i - 1] + alpha_l_iter[i]) / (2 * dz)
                 );
 
                 add(D[i], 6, 7,
@@ -1435,7 +1517,7 @@ int main() {
                 add(L[i], 6, 3, 0.0
 
                     // Capillary term (central differences)
-                    // + (DPcap[i] + DPcap[i + 1]) / (2 * dz)
+                    + (DPcap[i] + DPcap[i + 1]) / (2 * dz)
                 );
 
                 add(L[i], 6, 1, 0.0
@@ -1513,7 +1595,7 @@ int main() {
                 add(D[i], 10, 4, 1);
                 add(D[i], 10, 5, -1);
 
-                Q[i][10] = 0.0 /*DPcap[i] */ ;
+                Q[i][10] = DPcap[i];
 
                 #pragma endregion
 
@@ -1745,6 +1827,7 @@ int main() {
 
             // Update vectors from X
             for (int i = 0; i < N; ++i) {
+
                 rho_m[i] = alpha * X[i][0] + (1 - alpha) * rho_m[i];
                 rho_l[i] = alpha * X[i][1] + (1 - alpha) * rho_l[i];
                 alpha_m[i] = alpha * X[i][2] + (1 - alpha) * alpha_m[i];
@@ -1756,136 +1839,7 @@ int main() {
                 T_m[i] = alpha * X[i][8] + (1 - alpha) * T_m[i];
                 T_l[i] = alpha * X[i][9] + (1 - alpha) * T_l[i];
                 T_w[i] = alpha * X[i][10] + (1 - alpha) * T_w[i];
-
-                // Check parabolic profiles
-                c_w[i] = C1[i] * p_m[i] + C2[i] * T_m[i] + C3[i] * T_l[i] + C4[i] * T_w[i] + C5[i];
-                c_x[i] = C6[i] * p_m[i] + C7[i] * T_m[i] + C8[i] * T_l[i] + C9[i] * T_w[i] + C10[i];
-                b_w[i] = C11[i] * p_m[i] + C12[i] * T_m[i] + C13[i] * T_l[i] + C14[i] * T_w[i] + C15[i];
-                a_w[i] = C16[i] * p_m[i] + C17[i] * T_m[i] + C18[i] * T_l[i] + C19[i] * T_w[i] + C20[i];
-                b_x[i] = C21[i] * p_m[i] + C22[i] * T_m[i] + C23[i] * T_l[i] + C24[i] * T_w[i] + C25[i];
-                a_x[i] = C26[i] * p_m[i] + C27[i] * T_m[i] + C28[i] * T_l[i] + C29[i] * T_w[i] + C30[i];
-
-                residual1[i] = a_w[i] + Eio1 * b_w[i] + Eio2 * c_w[i] - T_w[i];
-                residual2[i] = a_x[i] + Evi1 * b_x[i] + Evi2 * c_x[i] - T_l[i];
-                residual3[i] = a_w[i] + r_i * b_w[i] + r_i * r_i * c_w[i] - a_x[i] - r_i * b_x[i] - r_i * r_i * c_x[i];
-                residual4[i] = k_w[i] * b_w[i] + 2 * r_i * k_w[i] * c_w[i] - k_x[i] * b_x[i] - 2 * r_i * k_x[i] * c_x[i];
-                residual5[i] = b_w[i] + 2 * r_o * c_w[i] - q_pp[i] / k_w[i];
-                residual6[i] = Ex3[i] * a_x[i] + Ex4[i] * b_x[i] + Ex5[i] * c_x[i] - Ex8[i] - Ex6[i] * T_m[i] - Ex7[i] * p_m[i];
-
-                // Check interface temperature
-                T_sur[i] = C31[i] * p_m[i] + C32[i] * T_m[i] + C33[i] * T_l[i] + C34[i] * T_w[i] + C35[i];
-                T_sur_lin[i] = a_x[i] + b_x[i] * r_v + c_x[i] * r_v * r_v;
-                T_sur_diff[i] = T_sur[i] - T_sur_lin[i];
-
-                // Check mass exchange
-                Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
-                Gamma_xv_lin[i] = C36[i] * p_m[i] + C37[i] * T_m[i] + C38[i] * T_l[i] + C39[i] * T_w[i] + C40[i];
-
-                Gamma_xv_approx_error[i] = Gamma_xv[i] - Gamma_xv_approx[i];
-                Gamma_xv_lin_error[i] = Gamma_xv[i] - Gamma_xv_lin[i];
-                Gamma_xv_diff_error[i] = Gamma_xv_approx[i] - Gamma_xv_lin[i];
-
-                // Check heat exchange balance liquid wall
-                heat_source_wall_liquid_flux[i] = C61[i] * p_m[i] + C62[i] * T_m[i] + C63[i] * T_l[i] + C64[i] * T_w[i] + C65[i];
-                heat_source_liquid_wall_flux[i] = C66[i] * p_m[i] + C67[i] * T_m[i] + C68[i] * T_l[i] + C69[i] * T_w[i] + C70[i];
-
-                heat_balance_wx[i] = heat_source_wall_liquid_flux[i] * (r_i / 2) + heat_source_liquid_wall_flux[i] * ((r_o * r_o - r_i * r_i) / (2 * r_i));
-
-                // Check heat exchange balance liquid vapor
-                heat_conduction_flux[i] = k_x[i] * (
-                    (C21[i] + 2 * r_v * (C6[i])) * p_m[i] +
-                    (C22[i] + 2 * r_v * (C7[i])) * T_m[i] +
-                    (C23[i] + 2 * r_v * (C8[i])) * T_l[i] +
-                    (C24[i] + 2 * r_v * (C9[i])) * T_w[i] +
-                    (C25[i] + 2 * r_v * (C10[i])));
-
-                heat_convection_flux[i] = H_xm[i] * (
-                    (C26[i] + r_v * C21[i] + r_v * r_v * C6[i]) * p_m[i] +
-                    (C27[i] + r_v * C22[i] + r_v * r_v * C7[i] - 1) * T_m[i] +
-                    (C28[i] + r_v * C23[i] + r_v * r_v * C8[i]) * T_l[i] +
-                    (C29[i] + r_v * C24[i] + r_v * r_v * C9[i]) * T_w[i] +
-                    (C30[i] + r_v * C25[i] + r_v * r_v * C10[i]));
-
-                heat_phase_flux[i] = (Dh[i] * r_i * r_i) / (2 * r_v) * (
-                    C36[i] * p_m[i] +
-                    C37[i] * T_m[i] +
-                    C38[i] * T_l[i] +
-                    C39[i] * T_w[i] +
-                    C40[i]);
-
-                balance_condition[i] = k_x[i] * (b_x[i] + 2 * c_x[i] * r_v)
-                    - H_xm[i] * (a_x[i] + b_x[i] * r_v + c_x[i] * r_v * r_v - T_m[i])
-                    - Dh[i] * r_i * r_i / (2 * r_v) * (aGamma[i] + bGamma[i] * (a_x[i] + b_x[i] * r_v + c_x[i] * r_v * r_v) + cGamma[i] * (p_m[i] - p_m_iter[i]));
-
-                heat_balance_xv[i] = heat_conduction_flux[i] - heat_convection_flux[i] - heat_phase_flux[i];
-
-                // Check heat sources definition
-
-                heat_source_vapor_liquid_flux[i] = C41[i] * p_m[i] + C42[i] * T_m[i] + C43[i] * T_l[i] + C44[i] * T_w[i] + C45[i];
-                heat_source_liquid_vapor_flux[i] = C46[i] * p_m[i] + C47[i] * T_m[i] + C48[i] * T_l[i] + C49[i] * T_w[i] + C50[i];
-
-                heat_source_vapor_liquid_phase[i] = C51[i] * p_m[i] + C52[i] * T_m[i] + C53[i] * T_l[i] + C54[i] * T_w[i] + C55[i];
-                heat_source_liquid_vapor_phase[i] = C56[i] * p_m[i] + C57[i] * T_m[i] + C58[i] * T_l[i] + C59[i] * T_w[i] + C60[i];
-
-                conduction_err[i] = heat_source_vapor_liquid_flux[i] * (r_i * r_i) / (2 * r_v) + heat_conduction_flux[i];
-                convection_err[i] = heat_source_liquid_vapor_flux[i] * (r_i * r_i) / (2 * r_v) - heat_convection_flux[i];
-                phase_change_err[i] = (heat_source_liquid_vapor_phase[i] + heat_source_vapor_liquid_phase[i]) * (r_i * r_i) / (2 * r_v) - heat_phase_flux[i];
-
-                heat_balance_xv_full[i] =
-                    + heat_source_vapor_liquid_flux[i]
-                    + heat_source_liquid_vapor_flux[i]
-                    + heat_source_liquid_vapor_phase[i] 
-                    + heat_source_vapor_liquid_phase[i];
-
-                heat_balance_wall[i] = q_pp[i] * (2 * M_PI * r_o * dz) + heat_source_liquid_wall_flux[i] * M_PI * (r_o * r_o - r_i * r_i);
-                heat_balance_wick[i] = (heat_source_vapor_liquid_phase[i] + heat_source_vapor_liquid_flux[i] + heat_source_wall_liquid_flux[i]) * M_PI * r_i * r_i;
-                heat_balance_vapor[i] = (heat_source_liquid_vapor_phase[i] + heat_source_liquid_vapor_flux[i]) * M_PI * r_i * r_i;
-
-                // Check mixture pressure work
-
-                pressure_work_m[i] = -p_m_iter[i] * (alpha_m_iter[i] - alpha_m_old[i]) / dt;
-
-                // Update heat fluxes at the interfaces
-                if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;       /// Evaporator imposed heat flux [W/m2]
-                else if (i >= (N - condenser_nodes)) {
-
-                    double conv = h_conv *
-                        (T_w_iter[i] - T_env);                              /// Condenser convective heat flux [W/m2]
-                    double irr = emissivity * sigma *
-                        (std::pow(T_w_iter[i], 4) - std::pow(T_env, 4));    /// Condenser irradiation heat flux [W/m2]
-
-                    q_pp[i] = -(conv + irr);                                /// Heat flux at the outer wall [W/m2] (positive if to the wall) 
-                }
             }
-
-            /*
-
-            if (n == 10000) {
-                std::cout << "=== TS 72, Picard iter " << pic << " ===" << std::endl;
-                auto p = [](double v) {
-                    std::ostringstream os;
-                    os << std::setprecision(2) << std::scientific << v;
-                    return os.str();
-                    };
-                std::cout << std::setw(3) << "i"
-                    << std::setw(12) << "rho_m" << std::setw(12) << "rho_l"
-                    << std::setw(12) << "alpha_m" << std::setw(12) << "alpha_l"
-                    << std::setw(12) << "p_m" << std::setw(12) << "p_l"
-                    << std::setw(12) << "v_m" << std::setw(12) << "v_l"
-                    << std::setw(12) << "T_m" << std::setw(12) << "T_l"
-                    << std::setw(12) << "T_w" << std::endl;
-                for (int i = 0; i < N; ++i) {
-                    std::cout << std::setw(3) << i
-                        << std::setw(12) << p(rho_m[i]) << std::setw(12) << p(rho_l[i])
-                        << std::setw(12) << p(alpha_m[i]) << std::setw(12) << p(alpha_l[i])
-                        << std::setw(12) << p(p_m[i]) << std::setw(12) << p(p_l[i])
-                        << std::setw(12) << p(v_m[i]) << std::setw(12) << p(v_l[i])
-                        << std::setw(12) << p(T_m[i]) << std::setw(12) << p(T_l[i])
-                        << std::setw(12) << p(T_w[i]) << std::endl;
-                }
-            }
-
-            */
 
             // After solving the linear system, before updating variables
             for (int i = 0; i < N; ++i) {
@@ -1902,7 +1856,7 @@ int main() {
 
                 if (found_nan) {
                     std::cout << "=== NaN DETECTED ===" << std::endl;
-                    std::cout << "Timestep: " << n << ", Picard iter: " << pic << ", Cell: " << i << std::endl;
+                    std::cout << "Time: " << time_total << ", Picard iter: " << pic << ", Cell: " << i << std::endl;
                     std::cout << "First NaN variable: " << var_name << std::endl;
                     std::cout << "--- All variables at cell " << i << " ---" << std::endl;
                     std::cout << "T_m  = " << T_m[i] << std::endl;
@@ -1931,6 +1885,31 @@ int main() {
                 }
             }
 
+            if (time_total == 4999) {
+                std::cout << "=== Time " << time_total << " Picard iter " << pic << " == = " << std::endl;
+                auto p = [](double v) {
+                    std::ostringstream os;
+                    os << std::setprecision(2) << std::scientific << v;
+                    return os.str();
+                    };
+                std::cout << std::setw(3) << "i"
+                    << std::setw(12) << "rho_m" << std::setw(12) << "rho_l"
+                    << std::setw(12) << "alpha_m" << std::setw(12) << "alpha_l"
+                    << std::setw(12) << "p_m" << std::setw(12) << "p_l"
+                    << std::setw(12) << "v_m" << std::setw(12) << "v_l"
+                    << std::setw(12) << "T_m" << std::setw(12) << "T_l"
+                    << std::setw(12) << "T_w" << std::endl;
+                for (int i = 0; i < N; ++i) {
+                    std::cout << std::setw(3) << i
+                        << std::setw(12) << p(rho_m[i]) << std::setw(12) << p(rho_l[i])
+                        << std::setw(12) << p(alpha_m[i]) << std::setw(12) << p(alpha_l[i])
+                        << std::setw(12) << p(p_m[i]) << std::setw(12) << p(p_l[i])
+                        << std::setw(12) << p(v_m[i]) << std::setw(12) << p(v_l[i])
+                        << std::setw(12) << p(T_m[i]) << std::setw(12) << p(T_l[i])
+                        << std::setw(12) << p(T_w[i]) << std::endl;
+                }
+            }
+
             // Check if variable converged
             for (int k = 0; k < B; ++k)
                 conv_var[k] = (L_pic[k] < pic_tol[k]);
@@ -1943,8 +1922,11 @@ int main() {
             if (conv_all) {
 
                 /*
+                 
+                // Check exact solution of the discretized equation
 
                 {
+
                     std::cout << "=== VAPOR MASS CELL-BY-CELL ===" << std::endl;
                     std::cout << std::setw(4) << "i"
                         << std::setw(16) << "accumulation"
@@ -1979,175 +1961,9 @@ int main() {
                         << " residual=" << total_accum + total_conv << std::endl;
                 }
 
-                {
-                    std::cout << "=== VAPOR MASS LINEARIZED RESIDUAL ===" << std::endl;
-                    std::cout << std::setw(4) << "i"
-                        << std::setw(16) << "accum"
-                        << std::setw(16) << "conv_D"
-                        << std::setw(16) << "conv_L"
-                        << std::setw(16) << "conv_R"
-                        << std::setw(16) << "conv_Q"
-                        << std::setw(16) << "residual" << std::endl;
+                */
 
-                    for (int i = 1; i < N - 1; ++i) {
-                        // --- Accumulation (D terms - Q temporal) ---
-                        double accum_D = (0.0
-                            + alpha_m_iter[i] / dt
-                            ) * rho_m[i]
-                            + (0.0
-                                + rho_m_iter[i] / dt
-                                ) * alpha_m[i];
-
-                        double accum_Q =
-                            +(rho_m_old[i] * alpha_m_old[i]) / dt
-                            + (rho_m_iter[i] * alpha_m_iter[i]) / dt;
-
-                        double accum = accum_D - accum_Q;
-
-                        // --- Convection from D (cell i) ---
-                        double conv_D_rho = (0.0
-                            + (alpha_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
-                            - (alpha_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
-                            ) * rho_m[i];
-
-                        double conv_D_alpha = (0.0
-                            + (rho_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])) / dz
-                            - (rho_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))) / dz
-                            ) * alpha_m[i];
-
-                        double conv_D_v = (0.0
-                            + (alpha_m_iter[i] * rho_m_iter[i] * H(v_m_iter[i])) / dz
-                            + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * (1 - H(v_m_iter[i]))) / dz
-                            ) * v_m[i];
-
-                        double conv_D = conv_D_rho + conv_D_alpha + conv_D_v;
-
-                        // --- Convection from L (cell i-1) ---
-                        double conv_L = (0.0
-                            - (alpha_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
-                            ) * rho_m[i - 1]
-                            + (0.0
-                                - (rho_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
-                                ) * alpha_m[i - 1]
-                            + (0.0
-                                - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * H(v_m_iter[i - 1])) / dz
-                                - (alpha_m_iter[i] * rho_m_iter[i] * (1 - H(v_m_iter[i - 1]))) / dz
-                                ) * v_m[i - 1];
-
-                        // --- Convection from R (cell i+1) ---
-                        double conv_R = (0.0
-                            + (alpha_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
-                            ) * rho_m[i + 1]
-                            + (0.0
-                                + (rho_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
-                                ) * alpha_m[i + 1];
-
-                        // --- Convection from Q ---
-                        double conv_Q = -2 * (
-                            +alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i] * H(v_m_iter[i])
-                            + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * v_m_iter[i] * (1 - H(v_m_iter[i]))
-                            - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * v_m_iter[i - 1] * H(v_m_iter[i - 1])
-                            - alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i - 1] * (1 - H(v_m_iter[i - 1]))
-                            ) / dz;
-
-                        double conv_total = conv_D + conv_L + conv_R + conv_Q;
-                        double residual = accum + conv_total;
-
-                        std::cout << std::setw(4) << i
-                            << std::setw(16) << std::scientific << std::setprecision(4) << accum
-                            << std::setw(16) << conv_D
-                            << std::setw(16) << conv_L
-                            << std::setw(16) << conv_R
-                            << std::setw(16) << conv_Q
-                            << std::setw(16) << residual << std::endl;
-                    }
-                    std::cout << std::defaultfloat;
-                }
-
-                {
-                    std::cout << "=== LIQUID MASS LINEARIZED RESIDUAL ===" << std::endl;
-                    std::cout << std::setw(4) << "i"
-                        << std::setw(16) << "accum"
-                        << std::setw(16) << "conv_D"
-                        << std::setw(16) << "conv_L"
-                        << std::setw(16) << "conv_R"
-                        << std::setw(16) << "conv_Q"
-                        << std::setw(16) << "residual" << std::endl;
-
-                    for (int i = 1; i < N - 1; ++i) {
-                        // --- Accumulation (D terms - Q temporal) ---
-                        double accum_D = (0.0
-                            + eps_v * (alpha_l_iter[i] / dt)
-                            ) * rho_l[i]
-                            + (0.0
-                                + eps_v * (rho_l_iter[i] / dt)
-                                ) * alpha_l[i];
-
-                        double accum_Q =
-                            +eps_v * (rho_l_iter[i] * alpha_l_iter[i]) / dt
-                            + eps_v * (rho_l_old[i] * alpha_l_old[i]) / dt;
-
-                        double accum = accum_D - accum_Q;
-
-                        // --- Convection from D (cell i) ---
-                        double conv_D_rho = (0.0
-                            + eps_v * (alpha_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
-                            - eps_v * (alpha_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
-                            ) * rho_l[i];
-
-                        double conv_D_alpha = (0.0
-                            + eps_v * (rho_l_iter[i] * v_l_iter[i] * H(v_l_iter[i])) / dz
-                            - eps_v * (rho_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1]))) / dz
-                            ) * alpha_l[i];
-
-                        double conv_D_v = (0.0
-                            + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * H(v_l_iter[i])) / dz
-                            + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * (1 - H(v_l_iter[i]))) / dz
-                            ) * v_l[i];
-
-                        double conv_D = conv_D_rho + conv_D_alpha + conv_D_v;
-
-                        // --- Convection from L (cell i-1) ---
-                        double conv_L = (0.0
-                            - eps_v * (alpha_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
-                            ) * rho_l[i - 1]
-                            + (0.0
-                                - eps_v * (rho_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
-                                ) * alpha_l[i - 1]
-                            + (0.0
-                                - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * H(v_l_iter[i - 1])) / dz
-                                - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * (1 - H(v_l_iter[i - 1]))) / dz
-                                ) * v_l[i - 1];
-
-                        // --- Convection from R (cell i+1) ---
-                        double conv_R = (0.0
-                            + eps_v * (alpha_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
-                            ) * rho_l[i + 1]
-                            + (0.0
-                                + eps_v * (rho_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
-                                ) * alpha_l[i + 1];
-
-                        // --- Convection from Q ---
-                        double conv_Q = -2 * (
-                            +eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i] * H(v_l_iter[i]))
-                            + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * v_l_iter[i] * (1 - H(v_l_iter[i])))
-                            - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * v_l_iter[i - 1] * H(v_l_iter[i - 1]))
-                            - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * v_l_iter[i - 1] * (1 - H(v_l_iter[i - 1])))
-                            ) / dz;
-
-                        double conv_total = conv_D + conv_L + conv_R + conv_Q;
-                        double residual = accum + conv_total;
-
-                        std::cout << std::setw(4) << i
-                            << std::setw(16) << std::scientific << std::setprecision(4) << accum
-                            << std::setw(16) << conv_D
-                            << std::setw(16) << conv_L
-                            << std::setw(16) << conv_R
-                            << std::setw(16) << conv_Q
-                            << std::setw(16) << residual << std::endl;
-                    }
-                    std::cout << std::defaultfloat;
-                }
+                /*
 
                 {
                     std::cout << "=== GLOBAL MASS CONSERVATION CHECK ===" << std::endl;
@@ -2224,6 +2040,10 @@ int main() {
                 std::cout << "Ghost " << N - 1 << ": alpha_l=" << alpha_l[N - 1] << " rho_l=" << rho_l[N - 1]
                     << " alpha_l_old=" << alpha_l_old[N - 1] << " rho_l_old=" << rho_l_old[N - 1] << std::endl;
 
+                */
+
+                /*
+
                 {
                     std::cout << "=== GHOST CELL MASS CHECK ===" << std::endl;
 
@@ -2291,6 +2111,10 @@ int main() {
                     std::cout << "    Liquid total accum: " << total_accum_l << std::endl;
                     std::cout << "    Total accum:        " << total_accum_m + total_accum_l << std::endl;
                 }
+
+                */
+
+                /*
 
                 {
                     std::cout << "=== PHYSICAL DOMAIN MASS BALANCE ===" << std::endl;
@@ -2398,6 +2222,10 @@ int main() {
                     std::cout << "  Total net flux: " << total_flux_m + total_flux_l << std::endl;
                     std::cout << "  Total balance: " << (total_accum_m + total_accum_l) - (total_flux_m + total_flux_l) << std::endl;
                 }
+
+                */
+
+                /*
 
                 {
                     std::cout << "=== PHYSICAL DOMAIN ENERGY BALANCE ===" << std::endl;
@@ -2675,23 +2503,18 @@ int main() {
         // Picard converged or max iterations reached
         if (pic != max_picard) {
 
-            rho_m_old = rho_m;
-            rho_l_old = rho_l;
-            alpha_m_old = alpha_m;
-            alpha_l_old = alpha_l;
-            p_m_old = p_m;
-            p_l_old = p_l;
-            v_m_old = v_m;
-            v_l_old = v_l;
-            T_m_old = T_m;
-            T_l_old = T_l;
-            T_w_old = T_w;
+            // Update total time elapsed
+            time_total += dt;
 
-            time_total += dt;       // Advance in time
+            if (time_total >= t_last_print + print_interval) {
 
-            const int output_every = 100;
+                // Time between timesteps [ms]
+                auto t_now = std::chrono::high_resolution_clock::now();
+                double simulation_time = std::chrono::duration<double, std::milli>(t_now - t_start_timestep).count();
 
-            if (n % output_every == 0) {
+                // Time from the start of the simulation
+                double clock_time = std::chrono::duration<double>(t_now - t_start_simulation).count();
+
                 for (int i = 1; i < N - 1; ++i) {
 
                     v_velocity_output << X[i][6] << " ";
@@ -2729,7 +2552,198 @@ int main() {
 					q_pp_output << q_pp[i] << " ";
                 }
 
+                // Check mass, energy and momentum balances for the phases
+
+                double total_accum_m = 0;
+                double total_accum_l = 0;
+
+                double total_accum_em = 0.0;
+                double total_accum_el = 0.0;
+
+                double total_accum_mm = 0.0;
+                double total_accum_ml = 0.0;
+
+                for (int i = 1; i < N - 1; ++i) {
+
+                    double accum_m = (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
+                    total_accum_m += accum_m;
+
+                    double accum_l = eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
+                    total_accum_l += accum_l;
+
+                    double e_now_l = eps_v * alpha_l[i] * rho_l[i] * cp_l[i] * T_l[i];
+                    double e_old_l = eps_v * alpha_l_old[i] * rho_l_old[i] * cp_l_old[i] * T_l_old[i];
+
+                    double accum_el = (e_now_l - e_old_l) / dt * dz;
+                    total_accum_el += accum_el;
+
+                    double e_now_m = alpha_m[i] * rho_m[i] * cp_m[i] * T_m[i];
+                    double e_old_m = alpha_m_old[i] * rho_m_old[i] * cp_m_old[i] * T_m_old[i];
+
+                    double accum_em = (e_now_m - e_old_m) / dt * dz;
+                    total_accum_em += accum_em;
+
+                    double arho_new_mm = (alpha_m[i - 1] * rho_m[i - 1] + alpha_m[i] * rho_m[i]) / 2.0;
+                    double arho_old_mm = (alpha_m_old[i - 1] * rho_m_old[i - 1] + alpha_m_old[i] * rho_m_old[i]) / 2.0;
+                    double accum_mm = (arho_new_mm * v_m[i] - arho_old_mm * v_m_old[i]) / dt;
+
+                    total_accum_mm += accum_mm * dz;
+
+                    double arho_new_ml = eps_v * (alpha_l[i - 1] * rho_l[i - 1] + alpha_l[i] * rho_l[i]) / 2.0;
+                    double arho_old_ml = eps_v * (alpha_l_old[i - 1] * rho_l_old[i - 1] + alpha_l_old[i] * rho_l_old[i]) / 2.0;
+                    double accum_ml = (arho_new_ml * v_l[i] - arho_old_ml * v_l_old[i]) / dt;
+
+                    total_accum_ml += accum_ml * dz;
+                }
+
+                double global_heat = 0.0;
+                double total_mass_v = 0.0;
+                double total_mass_l = 0.0;
+                double total_heat_v = 0.0;
+                double total_heat_l = 0.0;
+                double total_heat_w = 0.0;
+
+                for (int i = 1; i < N - 1; ++i) {
+
+                    // Check parabolic profiles
+                    c_w[i] = C1[i] * p_m[i] + C2[i] * T_m[i] + C3[i] * T_l[i] + C4[i] * T_w[i] + C5[i];
+                    c_x[i] = C6[i] * p_m[i] + C7[i] * T_m[i] + C8[i] * T_l[i] + C9[i] * T_w[i] + C10[i];
+                    b_w[i] = C11[i] * p_m[i] + C12[i] * T_m[i] + C13[i] * T_l[i] + C14[i] * T_w[i] + C15[i];
+                    a_w[i] = C16[i] * p_m[i] + C17[i] * T_m[i] + C18[i] * T_l[i] + C19[i] * T_w[i] + C20[i];
+                    b_x[i] = C21[i] * p_m[i] + C22[i] * T_m[i] + C23[i] * T_l[i] + C24[i] * T_w[i] + C25[i];
+                    a_x[i] = C26[i] * p_m[i] + C27[i] * T_m[i] + C28[i] * T_l[i] + C29[i] * T_w[i] + C30[i];
+
+                    residual1[i] = a_w[i] + Eio1 * b_w[i] + Eio2 * c_w[i] - T_w[i];
+                    residual2[i] = a_x[i] + Evi1 * b_x[i] + Evi2 * c_x[i] - T_l[i];
+                    residual3[i] = a_w[i] + r_i * b_w[i] + r_i * r_i * c_w[i] - a_x[i] - r_i * b_x[i] - r_i * r_i * c_x[i];
+                    residual4[i] = k_w[i] * b_w[i] + 2 * r_i * k_w[i] * c_w[i] - k_l[i] * b_x[i] - 2 * r_i * k_l[i] * c_x[i];
+                    residual5[i] = b_w[i] + 2 * r_o * c_w[i] - q_pp[i] / k_w[i];
+                    residual6[i] = Ex3[i] * a_x[i] + Ex4[i] * b_x[i] + Ex5[i] * c_x[i] - Ex8[i] - Ex6[i] * T_m[i] - Ex7[i] * p_m[i];
+
+                    // Check interface temperature
+                    T_sur[i] = C31[i] * p_m[i] + C32[i] * T_m[i] + C33[i] * T_l[i] + C34[i] * T_w[i] + C35[i];
+                    T_sur_lin[i] = a_x[i] + b_x[i] * r_v + c_x[i] * r_v * r_v;
+                    T_sur_diff[i] = T_sur[i] - T_sur_lin[i];
+
+                    // Check mass exchange
+                    Gamma_xv_approx[i] = aGamma[i] + bGamma[i] * T_sur[i] + cGamma[i] * (p_m[i] - p_m_iter[i]);
+                    Gamma_xv_lin[i] = C36[i] * p_m[i] + C37[i] * T_m[i] + C38[i] * T_l[i] + C39[i] * T_w[i] + C40[i];
+
+                    Gamma_xv_approx_error[i] = Gamma_xv[i] - Gamma_xv_approx[i];
+                    Gamma_xv_lin_error[i] = Gamma_xv[i] - Gamma_xv_lin[i];
+                    Gamma_xv_diff_error[i] = Gamma_xv_approx[i] - Gamma_xv_lin[i];
+
+                    // Check heat exchange balance liquid wall
+                    heat_source_wall_liquid_flux[i] = C61[i] * p_m[i] + C62[i] * T_m[i] + C63[i] * T_l[i] + C64[i] * T_w[i] + C65[i];
+                    heat_source_liquid_wall_flux[i] = C66[i] * p_m[i] + C67[i] * T_m[i] + C68[i] * T_l[i] + C69[i] * T_w[i] + C70[i];
+
+                    heat_balance_wx[i] = heat_source_wall_liquid_flux[i] * (r_i / 2) + heat_source_liquid_wall_flux[i] * ((r_o * r_o - r_i * r_i) / (2 * r_i));
+
+                    interface_wx_balance_output << heat_balance_wx[i] << " ";
+
+                    // Check heat exchange balance liquid vapor
+                    heat_conduction_flux[i] = k_l[i] * (
+                        (C21[i] + 2 * r_v * (C6[i])) * p_m[i] +
+                        (C22[i] + 2 * r_v * (C7[i])) * T_m[i] +
+                        (C23[i] + 2 * r_v * (C8[i])) * T_l[i] +
+                        (C24[i] + 2 * r_v * (C9[i])) * T_w[i] +
+                        (C25[i] + 2 * r_v * (C10[i])));
+
+                    heat_convection_flux[i] = H_xm[i] * (
+                        (C26[i] + r_v * C21[i] + r_v * r_v * C6[i]) * p_m[i] +
+                        (C27[i] + r_v * C22[i] + r_v * r_v * C7[i] - 1) * T_m[i] +
+                        (C28[i] + r_v * C23[i] + r_v * r_v * C8[i]) * T_l[i] +
+                        (C29[i] + r_v * C24[i] + r_v * r_v * C9[i]) * T_w[i] +
+                        (C30[i] + r_v * C25[i] + r_v * r_v * C10[i]));
+
+                    heat_phase_flux[i] = (Dh[i] * r_i * r_i) / (2 * r_v) * (
+                        C36[i] * p_m[i] +
+                        C37[i] * T_m[i] +
+                        C38[i] * T_l[i] +
+                        C39[i] * T_w[i] +
+                        C40[i]);
+
+                    balance_condition[i] = k_l[i] * (b_x[i] + 2 * c_x[i] * r_v)
+                        - H_xm[i] * (a_x[i] + b_x[i] * r_v + c_x[i] * r_v * r_v - T_m[i])
+                        - Dh[i] * r_i * r_i / (2 * r_v) * (aGamma[i] + bGamma[i] * (a_x[i] + b_x[i] * r_v + c_x[i] * r_v * r_v) + cGamma[i] * (p_m[i] - p_m_iter[i]));
+
+                    heat_balance_xv[i] = heat_conduction_flux[i] - heat_convection_flux[i] - heat_phase_flux[i];
+
+                    interface_xv_balance_output << heat_balance_xv[i] << " ";
+
+                    // Check heat sources definition
+
+                    heat_source_vapor_liquid_flux[i] = C41[i] * p_m[i] + C42[i] * T_m[i] + C43[i] * T_l[i] + C44[i] * T_w[i] + C45[i];
+                    heat_source_liquid_vapor_flux[i] = C46[i] * p_m[i] + C47[i] * T_m[i] + C48[i] * T_l[i] + C49[i] * T_w[i] + C50[i];
+
+                    heat_source_vapor_liquid_phase[i] = C51[i] * p_m[i] + C52[i] * T_m[i] + C53[i] * T_l[i] + C54[i] * T_w[i] + C55[i];
+                    heat_source_liquid_vapor_phase[i] = C56[i] * p_m[i] + C57[i] * T_m[i] + C58[i] * T_l[i] + C59[i] * T_w[i] + C60[i];
+
+                    conduction_err[i] = heat_source_vapor_liquid_flux[i] * (r_i * r_i) / (2 * r_v) + heat_conduction_flux[i];
+                    convection_err[i] = heat_source_liquid_vapor_flux[i] * (r_i * r_i) / (2 * r_v) - heat_convection_flux[i];
+                    phase_change_err[i] = (heat_source_liquid_vapor_phase[i] + heat_source_vapor_liquid_phase[i]) * (r_i * r_i) / (2 * r_v) - heat_phase_flux[i];
+
+                    heat_balance_xv_full[i] =
+                        + heat_source_vapor_liquid_flux[i]
+                        + heat_source_liquid_vapor_flux[i]
+                        + heat_source_liquid_vapor_phase[i]
+                        + heat_source_vapor_liquid_phase[i];
+
+                    heat_balance_wall[i] = q_pp[i] * (2 * M_PI * r_o * dz) + heat_source_liquid_wall_flux[i] * M_PI * (r_o * r_o - r_i * r_i);
+                    heat_balance_wick[i] = (heat_source_vapor_liquid_phase[i] + heat_source_vapor_liquid_flux[i] + heat_source_wall_liquid_flux[i]) * M_PI * r_i * r_i;
+                    heat_balance_vapor[i] = (heat_source_liquid_vapor_phase[i] + heat_source_liquid_vapor_flux[i]) * M_PI * r_i * r_i;
+
+                    // Check mixture pressure work
+
+                    pressure_work_m[i] = -p_m_iter[i] * (alpha_m_iter[i] - alpha_m_old[i]) / dt;
+
+                    // Check global heat balance
+
+                    global_heat += q_pp[i] * (2 * M_PI * r_o * dz);
+
+                    // Check total mass vapor sources
+
+                    total_mass_v += Gamma_xv_lin[i];
+
+                    // Check total mass liquid sources
+
+                    total_mass_l += -Gamma_xv_lin[i];
+
+                    // Check total heat vapor sources
+
+                    total_heat_v += +heat_source_liquid_vapor_flux[i] + heat_source_liquid_vapor_phase[i];
+
+                    // Check total heat liquid sources
+
+                    total_heat_l += +heat_source_vapor_liquid_flux[i] + heat_source_vapor_liquid_phase[i];
+
+                    // Check total heat wall sources
+
+                    total_heat_w += q_pp[i] * (2 * M_PI * r_o * dz) + heat_source_liquid_wall_flux[i] * M_PI * (r_o * r_o - r_i * r_i);
+                }
+
                 time_output << time_total << " ";
+                dt_output << dt << " ";
+                simulation_time_output << simulation_time << " ";
+                clock_time_output << clock_time << " ";
+
+                acc_mass_v_output << total_accum_m << " ";
+                acc_mass_l_output << total_accum_l << " ";
+
+                acc_energy_v_output << total_accum_em << " ";
+                acc_energy_l_output << total_accum_el << " ";
+
+                acc_mom_v_output << total_accum_mm << " ";
+                acc_mom_l_output << total_accum_ml << " ";
+
+                total_mass_balance_v_output << total_mass_v << " ";
+                total_mass_balance_l_output << total_mass_l << " ";
+
+                total_heat_balance_v_output << total_heat_v << " ";
+                total_heat_balance_l_output << total_heat_l << " ";
+
+                global_heat_balance_output << global_heat << " ";
+                total_heat_balance_w_output << total_heat_w << " ";
 
                 v_velocity_output << "\n";
                 v_pressure_output << "\n";
@@ -2764,6 +2778,9 @@ int main() {
 				dpcap_output << "\n";
 				q_pp_output << "\n";
 
+                interface_wx_balance_output << "\n";
+                interface_xv_balance_output << "\n";
+
                 v_velocity_output.flush();
                 v_pressure_output.flush();
                 v_temperature_output.flush();
@@ -2791,9 +2808,47 @@ int main() {
                 tsur_output.flush();
 
                 time_output.flush();
+                dt_output.flush();
+                simulation_time_output.flush();
+                clock_time_output.flush();
 
 				dpcap_output.flush();
 				q_pp_output.flush();
+
+                acc_mass_v_output.flush();
+                acc_mass_l_output.flush();
+
+                acc_energy_v_output.flush();
+                acc_energy_l_output.flush();
+
+                acc_mom_v_output.flush();
+                acc_mom_l_output.flush();
+
+                total_mass_balance_v_output.flush();
+                total_mass_balance_l_output.flush();
+
+                total_heat_balance_v_output.flush();
+                total_heat_balance_l_output.flush();
+
+                global_heat_balance_output.flush();
+                total_heat_balance_w_output.flush();
+
+                interface_wx_balance_output.flush();
+                interface_xv_balance_output.flush();
+
+                rho_m_old = rho_m;
+                rho_l_old = rho_l;
+                alpha_m_old = alpha_m;
+                alpha_l_old = alpha_l;
+                p_m_old = p_m;
+                p_l_old = p_l;
+                v_m_old = v_m;
+                v_l_old = v_l;
+                T_m_old = T_m;
+                T_l_old = T_l;
+                T_w_old = T_w;
+
+                t_last_print += print_interval;
             }
         }
         else {
@@ -2813,7 +2868,6 @@ int main() {
             T_w = T_w_old;
 
             halves += 1;        // Half again the timestep
-            n -= 1;             // No time iteration considered
         }
     }
 
@@ -2844,10 +2898,33 @@ int main() {
     tsur_output.close();
 
     time_output.close();
+    dt_output.close();
+    simulation_time_output.close();
+    clock_time_output.close();
 
 	dpcap_output.close();
 	q_pp_output.close();
 
-    double end = omp_get_wtime();
-    printf("Execution time: %.6f s\n", end - start);
+    acc_mass_v_output.close();
+    acc_mass_l_output.close();
+
+    acc_energy_v_output.close();
+    acc_energy_l_output.close();
+
+    acc_mom_v_output.close();
+    acc_mom_l_output.close();
+
+    total_mass_balance_v_output.close();
+    total_mass_balance_l_output.close();
+
+    total_heat_balance_v_output.close();
+    total_heat_balance_l_output.close();
+
+    global_heat_balance_output.close();
+    total_heat_balance_w_output.close();
+
+    interface_wx_balance_output.close();
+    interface_xv_balance_output.close();
+
+    return 0;
 }
