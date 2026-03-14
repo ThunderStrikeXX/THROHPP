@@ -68,11 +68,6 @@ if not cases:
     print("No case folders found")
     sys.exit(1)
 
-
-if not cases:
-    print("No case folders found")
-    sys.exit(1)
-
 print("Available cases:")
 for i, c in enumerate(cases):
     print(f"{i}: {os.path.relpath(c, root)}")
@@ -85,23 +80,61 @@ case_labels = [
     for c in cases_sel
 ]
 
-
 # ============================================================
 # Files and metadata
 # ============================================================
 targets = [
-    "interface_wx_balance.txt",
-    "interface_xv_balance.txt",
+    "power_residual_wx.txt",
+    "power_residual_xv.txt",
+
+    "residual_1.txt",
+    "residual_2.txt",
+    "residual_3.txt",
+    "residual_4.txt",
+    "residual_5.txt",
+    "residual_6.txt",
+
+    "T_sur_diff.txt",
+
+    "Gamma_xv_approx_error.txt",
+    "Gamma_xv_lin_error.txt",
+    "Gamma_xv_diff_error.txt",
 ]
 
 names = [
-    "Heat volumetric balance \n at the wall/liquid interface",
-    "Heat volumetric balance \n at the liquid/vapor interface",
+    "Power residual at the wall/liquid interface",
+    "Power residual at the liquid/vapor interface",
+
+    "a_x residual",
+    "a_w residual",
+    "b_x residual",
+    "b_w residual",
+    "c_x residual",
+    "c_w residual",
+
+    "T_sur difference",
+
+    "Gamma_xv approximation error",
+    "Gamma_xv linearization error",
+    "Gamma_xv difference error",
 ]
 
 units = [
-    "[W/m3]", 
-    "[W/m3]"
+    "[W]",
+    "[W]",
+
+    "[K]",
+    "[K]",
+    "[K/m]",
+    "[K/m]",
+    "[K/m^2]",
+    "[K/m^2]",
+
+    "[K]",
+
+    "[kg/m^3]",
+    "[kg/m^3]",
+    "[kg/m^3]",
 ]
 
 # ============================================================
@@ -157,27 +190,40 @@ time_box = TextBox(ax_timebox, "Set t [s] ", initial=f"{TIME[0]:.6g}")
 # Variable buttons
 # ============================================================
 buttons = []
-n_vars = len(names)
-n_cols = 1
-button_width = 0.18
-button_height = 0.12
-col_gap = 0.005
 
-panel_left = 0.62
+n_vars = len(names)
+n_cols = 2
+
+button_width = 0.17
+button_height = 0.1
+
+col_gap = 0.01
+row_gap = 0.01   # << controllo diretto dello spazio verticale
+
+panel_left = 0.60
 panel_top = 0.95
-panel_bottom = 0.05
+
 n_rows = int(np.ceil(n_vars / n_cols))
-row_height = (panel_top - panel_bottom) / (n_rows + 2.0)
 
 for i, name in enumerate(names):
+
     col = i % n_cols
     row = i // n_cols
+
     x_pos = panel_left + col * (button_width + col_gap)
-    y_pos = panel_top - (row + 1) * row_height
+    y_pos = panel_top - (row + 1) * button_height - row * row_gap
+
     bax = plt.axes([x_pos, y_pos, button_width, button_height])
-    btn = Button(bax, name)
-    btn.label.set_fontsize(9)
+
+    btn = Button(
+        bax,
+        "\n".join(textwrap.wrap(name, width=18))
+    )
+
+    btn.label.set_fontsize(8)
+
     buttons.append(btn)
+
 
 # ============================================================
 # State
@@ -263,11 +309,8 @@ def change_variable(idx):
     global current_var
     current_var = idx
     ax.set_title(f"{names[idx]} {units[idx]}")
-
-
     ax.set_ylim(*robust_ylim(Y[idx]))
     ax.legend(handles=lines, loc='best')
-
     current_frame[0] = 0
     draw_frame(0)
 
@@ -307,16 +350,13 @@ def reset(event):
 def save_plot(event):
     fig.canvas.draw()
 
-    # bounding box dell'axes
     bbox = ax.get_tightbbox(fig.canvas.get_renderer())
     bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
 
     desktop = os.path.join(os.path.expanduser("~"), "Desktop")
 
-    filename = os.path.join(
-        desktop,
-        f"{names[current_var].replace(' ', '_')}.png"
-    )
+    safe_name = names[current_var].replace(" ", "_").replace("/", "_")
+    filename = os.path.join(desktop, f"{safe_name}.png")
 
     fig.savefig(
         filename,
@@ -346,7 +386,6 @@ ani = FuncAnimation(
     repeat=True
 )
 
-# force start in paused state
 ani.event_source.stop()
 running[0] = False
 current_frame[0] = 0
