@@ -140,17 +140,16 @@ targets = [
     "vapor_alpha.txt",
     "liquid_alpha.txt",
     "gamma_xv.txt",
-    "phi_xv.txt",
-    "heat_source_wall_liquid_flux.txt",
-    "heat_source_liquid_wall_flux.txt",
-    "heat_source_vapor_liquid_phase.txt",
-    "heat_source_liquid_vapor_phase.txt",
-    "heat_source_vapor_liquid_flux.txt",
-    "heat_source_liquid_vapor_flux.txt",
+    "power_flux_wx.txt",
+    "power_flux_xw.txt",
+    "power_flux_vx.txt",
+    "power_mass_xv.txt",
+    "power_mass_vx.txt",
+    "power_flux_xv.txt",
     "p_saturation.txt",
     "T_sur.txt",
     "delta_p_capillary.txt",
-    "q_pp.txt"
+    "power_flux_ow.txt"
 ]
 
 names = [
@@ -165,18 +164,17 @@ names = [
     "Wall temperature",
     "Vapor volume fraction",
     "Liquid volume fraction",
-    "Mass transfer coefficient (gamma_xv)",
-    "Mass flux (phi_xv)",
-    "Heat flux from wall to liquid",
-    "Heat flux from liquid to wall",
-    "Heat source from vapor to liquid due to phase change",
-    "Heat source from liquid to vapor due to phase change",
-    "Heat flux from vapor to liquid",
-    "Heat flux from liquid to vapor",
+    "Mass transfer rate",
+    "Power from wall to liquid",
+    "Power from liquid to wall",
+    "Power from vapor to liquid due to phase change",
+    "Power from liquid to vapor due to phase change",
+    "Power from vapor to liquid",
+    "Power from liquid to vapor",
     "Saturation pressure",
     "Interface temperature (T_sur)",
     "Capillary pressure drop",
-    "Applied heat flux q_pp"
+    "External power"
 ]
 
 units = [
@@ -184,12 +182,12 @@ units = [
     "[m/s]", "[Pa]", "[K]", "[kg/m³]",
     "[K]",
     "[-]", "[-]",
-    "[kg/(m³·s)]", "[kg/(m²·s)]",
-    "[W/m²]", "[W/m²]",
-    "[W/m³]", "[W/m³]",
-    "[W/m²]", "[W/m²]",
+    "[kg/s]",
+    "[W]", "[W]",
+    "[W]", "[W]",
+    "[W]", "[W]",
     "[Pa]", "[K]",
-    "[Pa]", "[W/m²]"
+    "[Pa]", "[W]"
 ]
 
 # ============================================================

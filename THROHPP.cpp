@@ -254,18 +254,18 @@ int main() {
     std::ofstream l_alpha_output(name + "/liquid_alpha.txt", std::ios::trunc);
 
     std::ofstream gamma_output(name + "/gamma_xv.txt", std::ios::trunc);
-    std::ofstream phi_output(name + "/phi_xv.txt", std::ios::trunc);
-    std::ofstream hs_wl_flux_output(name + "/power_flux_wx.txt", std::ios::trunc);
-    std::ofstream hs_lw_flux_output(name + "/power_flux_xw.txt", std::ios::trunc);
-    std::ofstream hs_vl_phase_output(name + "/power_mass_vx.txt", std::ios::trunc);
-    std::ofstream hs_lv_phase_output(name + "/power_mass_xv.txt", std::ios::trunc);
-    std::ofstream hs_vl_flux_output(name + "/power_flux_vx.txt", std::ios::trunc);
-    std::ofstream hs_lv_flux_output(name + "/power_flux_xv.txt", std::ios::trunc);
+
+    std::ofstream power_flux_ow_output(name + "/power_flux_ow.txt", std::ios::trunc);
+    std::ofstream power_flux_wx_output(name + "/power_flux_wx.txt", std::ios::trunc);
+    std::ofstream power_flux_xw_output(name + "/power_flux_xw.txt", std::ios::trunc);
+    std::ofstream power_mass_vx_output(name + "/power_mass_vx.txt", std::ios::trunc);
+    std::ofstream power_mass_xv_output(name + "/power_mass_xv.txt", std::ios::trunc);
+    std::ofstream power_flux_vx_output(name + "/power_flux_vx.txt", std::ios::trunc);
+    std::ofstream power_flux_xv_output(name + "/power_flux_xv.txt", std::ios::trunc);
+
+    std::ofstream dpcap_output(name + "/delta_p_capillary.txt", std::ios::trunc);
     std::ofstream psat_output(name + "/p_saturation.txt", std::ios::trunc);
     std::ofstream tsur_output(name + "/T_sur.txt", std::ios::trunc);
-
-	std::ofstream dpcap_output(name + "/delta_p_capillary.txt", std::ios::trunc);
-	std::ofstream q_pp_output(name + "/q_pp.txt", std::ios::trunc);
 
     // -------------- BALANCES ------------
 
@@ -326,18 +326,17 @@ int main() {
     l_alpha_output << std::setprecision(global_precision);
 
     gamma_output << std::setprecision(global_precision);
-    phi_output << std::setprecision(global_precision);
-    hs_wl_flux_output << std::setprecision(global_precision);
-    hs_lw_flux_output << std::setprecision(global_precision);
-    hs_vl_phase_output << std::setprecision(global_precision);
-    hs_lv_phase_output << std::setprecision(global_precision);
-    hs_vl_flux_output << std::setprecision(global_precision);
-    hs_lv_flux_output << std::setprecision(global_precision);
+    power_flux_wx_output << std::setprecision(global_precision);
+    power_flux_xw_output << std::setprecision(global_precision);
+    power_mass_vx_output << std::setprecision(global_precision);
+    power_mass_xv_output << std::setprecision(global_precision);
+    power_flux_vx_output << std::setprecision(global_precision);
+    power_flux_xv_output << std::setprecision(global_precision);
     psat_output << std::setprecision(global_precision);
     tsur_output << std::setprecision(global_precision);
 
 	dpcap_output << std::setprecision(global_precision);
-	q_pp_output << std::setprecision(global_precision);
+	power_flux_ow_output << std::setprecision(global_precision);
 
     acc_mass_v_output << std::setprecision(global_precision);
     acc_mass_l_output << std::setprecision(global_precision);
@@ -2580,22 +2579,22 @@ int main() {
                     l_alpha_output << X[i][3] << " ";
 
                     gamma_output << Gamma_xv[i] * (M_PI * r_i * r_i * dz) << " ";
-                    phi_output << phi_x_v[i] << " ";
 
-                    hs_wl_flux_output << power_flux_wx[i] * (M_PI * r_i * r_i * dz) << " ";
-                    hs_lw_flux_output << power_flux_xw[i] * (M_PI * (r_o * r_o - r_i * r_i) * dz) << " ";
+                    power_flux_ow_output << q_pp[i] * (2 * M_PI * r_o * dz) << " ";
 
-                    hs_vl_phase_output << power_mass_vx[i] * (M_PI * r_i * r_i * dz) << " ";
-                    hs_lv_phase_output << power_mass_xv[i] * (M_PI * r_i * r_i * dz) << " ";
+                    power_flux_wx_output << power_flux_wx[i] << " ";
+                    power_flux_xw_output << power_flux_xw[i] << " ";
 
-                    hs_vl_flux_output << power_flux_vx[i] * (M_PI * r_i * r_i * dz) << " ";
-                    hs_lv_flux_output << power_flux_xv[i] * (M_PI * r_i * r_i * dz) << " ";
+                    power_mass_vx_output << power_mass_vx[i] << " ";
+                    power_mass_xv_output << power_mass_xv[i] << " ";
+
+                    power_flux_vx_output << power_flux_vx[i] << " ";
+                    power_flux_xv_output << power_flux_xv[i] << " ";
 
                     psat_output << p_saturation[i] << " ";
                     tsur_output << T_sur[i] << " ";
 
 					dpcap_output << DPcap[i] << " ";
-					q_pp_output << q_pp[i] * (2 * M_PI * r_o * dz) << " ";
                 }
 
                 // --------- RESIDUALS -----------
@@ -2779,22 +2778,21 @@ int main() {
                 l_alpha_output << "\n";
 
                 gamma_output << "\n";
-                phi_output << "\n";
 
-                hs_wl_flux_output << "\n";
-                hs_lw_flux_output << "\n";
+                power_flux_wx_output << "\n";
+                power_flux_xw_output << "\n";
 
-                hs_vl_phase_output << "\n";
-                hs_lv_phase_output << "\n";
+                power_mass_vx_output << "\n";
+                power_mass_xv_output << "\n";
 
-                hs_vl_flux_output << "\n";
-                hs_lv_flux_output << "\n";
+                power_flux_vx_output << "\n";
+                power_flux_xv_output << "\n";
 
                 psat_output << "\n";
                 tsur_output << "\n";
 
 				dpcap_output << "\n";
-				q_pp_output << "\n";
+				power_flux_ow_output << "\n";
 
                 power_residual_wx_output << "\n";
                 power_residual_xv_output << "\n";
@@ -2828,13 +2826,12 @@ int main() {
                 l_alpha_output.flush();
 
                 gamma_output.flush();
-                phi_output.flush();
-                hs_wl_flux_output.flush();
-                hs_lw_flux_output.flush();
-                hs_vl_phase_output.flush();
-                hs_lv_phase_output.flush();
-                hs_vl_flux_output.flush();
-                hs_lv_flux_output.flush();
+                power_flux_wx_output.flush();
+                power_flux_xw_output.flush();
+                power_mass_vx_output.flush();
+                power_mass_xv_output.flush();
+                power_flux_vx_output.flush();
+                power_flux_xv_output.flush();
                 psat_output.flush();
                 tsur_output.flush();
 
@@ -2844,7 +2841,7 @@ int main() {
                 clock_time_output.flush();
 
 				dpcap_output.flush();
-				q_pp_output.flush();
+				power_flux_ow_output.flush();
 
                 acc_mass_v_output.flush();
                 acc_mass_l_output.flush();
@@ -2931,13 +2928,13 @@ int main() {
     l_alpha_output.close();
 
     gamma_output.close();
-    phi_output.close();
-    hs_wl_flux_output.close();
-    hs_lw_flux_output.close();
-    hs_vl_phase_output.close();
-    hs_lv_phase_output.close();
-    hs_vl_flux_output.close();
-    hs_lv_flux_output.close();
+
+    power_flux_wx_output.close();
+    power_flux_xw_output.close();
+    power_mass_vx_output.close();
+    power_mass_xv_output.close();
+    power_flux_vx_output.close();
+    power_flux_xv_output.close();
     psat_output.close();
     tsur_output.close();
 
@@ -2947,7 +2944,7 @@ int main() {
     clock_time_output.close();
 
 	dpcap_output.close();
-	q_pp_output.close();
+	power_flux_ow_output.close();
 
     acc_mass_v_output.close();
     acc_mass_l_output.close();
