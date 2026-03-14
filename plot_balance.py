@@ -35,7 +35,6 @@ for d in os.listdir(root):
             if os.path.isdir(full) and sub.startswith("case_"):
                 cases.append(full)
 
-
 cases = sorted(cases)
 
 if len(cases) == 0:
@@ -53,12 +52,32 @@ case = cases[idx]
 time_file = os.path.join(case, "time.txt")
 
 targets = [
-    "acc_mass_l.txt",
     "acc_mass_v.txt",
-    "acc_mom_l.txt",
-    "acc_mom_v.txt",
-    "acc_energy_l.txt",
+    "acc_mass_l.txt",
     "acc_energy_v.txt",
+    "acc_energy_l.txt",
+    "acc_mom_v.txt",
+    "acc_mom_l.txt",
+
+    "bal_mass_v.txt",
+    "bal_mass_l.txt",
+    "bal_energy_v.txt",
+    "bal_energy_l.txt",
+    "bal_mom_v.txt",
+    "bal_mom_l.txt",
+
+    "diff_mass_v.txt",
+    "diff_mass_l.txt",
+    "diff_energy_v.txt",
+    "diff_energy_l.txt",
+    "diff_mom_v.txt",
+    "diff_mom_l.txt",
+
+    "acc_energy_w.txt",
+    "bal_energy_w.txt",
+    "diff_energy_w.txt",
+
+    "global_heat_balance.txt",
 ]
 
 y_files = [os.path.join(case, f) for f in targets]
@@ -81,44 +100,104 @@ time = time[::stride]
 Y = [y[::stride] for y in Y]
 
 names = [
-    "Mass\naccumulation (liquid)",
     "Mass\naccumulation (vapor)",
-    "Momentum\naccumulation (liquid)",
-    "Momentum\naccumulation (vapor)",
-    "Energy\nresidual (liquid)",
+    "Mass\naccumulation (liquid)",
     "Energy\naccumulation (vapor)",
+    "Energy\naccumulation (liquid)",
+    "Momentum\naccumulation (vapor)",
+    "Momentum\naccumulation (liquid)",
+
+    "Mass\nbalance (vapor)",
+    "Mass\nbalance (liquid)",
+    "Energy\nbalance (vapor)",
+    "Energy\nbalance (liquid)",
+    "Momentum\nbalance (vapor)",
+    "Momentum\nbalance (liquid)",
+
+    "Mass\ndifference (vapor)",
+    "Mass\ndifference (liquid)",
+    "Energy\ndifference (vapor)",
+    "Energy\ndifference (liquid)",
+    "Momentum\ndifference (vapor)",
+    "Momentum\ndifference (liquid)",
+
+    "Energy\naccumulation (wall)",
+    "Energy\nbalance (wall)",
+    "Energy\ndifference (wall)",
+
+    "Global heat\nbalance",
 ]
 
+units = [
+    "[kg/s]",
+    "[kg/s]",
+    "[W]",
+    "[W]",
+    "[N]",
+    "[N]",
 
-units = ["[-]"] * len(names)
+    "[kg/s]",
+    "[kg/s]",
+    "[W]",
+    "[W]",
+    "[N]",
+    "[N]",
+
+    "[kg/s]",
+    "[kg/s]",
+    "[W]",
+    "[W]",
+    "[N]",
+    "[N]",
+
+    "[W]",
+    "[W]",
+    "[W]",
+
+    "[W]",
+]
 
 # -------------------- Utils --------------------
 def robust_ylim(y):
+    y = np.asarray(y).ravel()
+    y = y[np.isfinite(y)]
+
+    if y.size == 0:
+        return -1.0, 1.0
+
     lo, hi = np.percentile(y, [1, 99])
     if lo == hi:
         lo, hi = np.min(y), np.max(y)
+
     margin = 0.1 * (hi - lo) if hi > lo else 1.0
     return lo - margin, hi + margin
 
 # -------------------- Figure --------------------
-fig, ax = plt.subplots(figsize=(10, 6))
-plt.subplots_adjust(left=0.10, bottom=0.15, right=0.75)
+fig, ax = plt.subplots(figsize=(12, 8))
+plt.subplots_adjust(left=0.10, bottom=0.12, right=0.72)
 
-line, = ax.plot([], [], lw=2, marker='o', markersize=4)
+line, = ax.plot([], [], lw=2, marker='o', markersize=3)
 ax.grid(True)
 ax.set_xlabel("Time [s]")
 
 # -------------------- Buttons --------------------
 buttons = []
-button_width = 0.18
-button_height = 0.08
+button_width = 0.11
+button_height = 0.05
 
-panel_left = 0.78
-panel_top = 0.80
-row_gap = 0.10
+panel_left_1 = 0.75
+panel_left_2 = 0.87
+panel_top = 0.90
+row_gap = 0.055
+n_rows = int(np.ceil(len(names) / 2))
 
 for i, name in enumerate(names):
-    y_pos = panel_top - i * row_gap
+    col = i // n_rows
+    row = i % n_rows
+
+    panel_left = panel_left_1 if col == 0 else panel_left_2
+    y_pos = panel_top - row * row_gap
+
     b_ax = plt.axes([panel_left, y_pos, button_width, button_height])
     btn = Button(b_ax, name, hovercolor='0.975')
     buttons.append(btn)
@@ -127,11 +206,12 @@ current_idx = 0
 ax.set_title(f"{names[current_idx]} {units[current_idx]}")
 ax.set_xlim(time.min(), time.max())
 ax.set_ylim(*robust_ylim(Y[current_idx]))
+ax.set_ylabel(units[current_idx])
 
 # -------------------- Drawing --------------------
 def draw():
-    y = np.asarray(Y[current_idx])
-    t = np.asarray(time)
+    y = np.asarray(Y[current_idx]).squeeze()
+    t = np.asarray(time).squeeze()
 
     n = min(len(t), len(y))
     t = t[:n]
@@ -140,8 +220,8 @@ def draw():
     line.set_data(t, y)
     ax.set_xlim(t.min(), t.max())
     ax.set_ylim(*robust_ylim(y))
+    ax.set_ylabel(units[current_idx])
     fig.canvas.draw_idle()
-
 
 # -------------------- Variable change --------------------
 def change_variable(idx):

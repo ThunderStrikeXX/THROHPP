@@ -160,7 +160,7 @@ int main() {
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
     const double T_left = 1000.0;                        /// First node initialization temperature [K]
-    const double T_right = 1000.0;                       /// Last node initialization temperature [K]
+    const double T_right = 900.0;                       /// Last node initialization temperature [K]
 
     // Temperatures initialization
     for (int i = 0; i < N; ++i) {
@@ -278,14 +278,29 @@ int main() {
     std::ofstream acc_mom_v_output(name + "/acc_mom_v.txt", std::ios::trunc);
     std::ofstream acc_mom_l_output(name + "/acc_mom_l.txt", std::ios::trunc);
 
-    std::ofstream total_mass_balance_v_output(name + "/total_mass_balance_v.txt", std::ios::trunc);
-    std::ofstream total_mass_balance_l_output(name + "/total_mass_balance_l.txt", std::ios::trunc);
+    std::ofstream bal_mass_v_output(name + "/bal_mass_v.txt", std::ios::trunc);
+    std::ofstream bal_mass_l_output(name + "/bal_mass_l.txt", std::ios::trunc);
 
-    std::ofstream total_heat_balance_v_output(name + "/total_heat_balance_v.txt", std::ios::trunc);
-    std::ofstream total_heat_balance_l_output(name + "/total_heat_balance_l.txt", std::ios::trunc);
+    std::ofstream bal_energy_v_output(name + "/bal_energy_v.txt", std::ios::trunc);
+    std::ofstream bal_energy_l_output(name + "/bal_energy_l.txt", std::ios::trunc);
 
-    std::ofstream global_heat_balance_output(name + "/global_heat_balance.txt", std::ios::trunc);
-    std::ofstream total_heat_balance_w_output(name + "/total_heat_balance_w.txt", std::ios::trunc);
+    std::ofstream bal_mom_v_output(name + "/bal_mom_v.txt", std::ios::trunc);
+    std::ofstream bal_mom_l_output(name + "/bal_mom_l.txt", std::ios::trunc);
+
+    std::ofstream diff_mass_v_output(name + "/diff_mass_v.txt", std::ios::trunc);
+    std::ofstream diff_mass_l_output(name + "/diff_mass_l.txt", std::ios::trunc);
+
+    std::ofstream diff_energy_v_output(name + "/diff_energy_v.txt", std::ios::trunc);
+    std::ofstream diff_energy_l_output(name + "/diff_energy_l.txt", std::ios::trunc);
+
+    std::ofstream diff_mom_v_output(name + "/diff_mom_v.txt", std::ios::trunc);
+    std::ofstream diff_mom_l_output(name + "/diff_mom_l.txt", std::ios::trunc);
+
+    std::ofstream acc_energy_w_output(name + "/acc_energy_w.txt", std::ios::trunc);
+    std::ofstream bal_energy_w_output(name + "/bal_energy_w.txt", std::ios::trunc);
+    std::ofstream diff_energy_w_output(name + "/diff_energy_w.txt", std::ios::trunc);
+
+    std::ofstream global_energy_balance_output(name + "/global_heat_balance.txt", std::ios::trunc);
 
     // ---------- RESIDUALS -------------
 
@@ -347,14 +362,29 @@ int main() {
     acc_mom_v_output << std::setprecision(global_precision);
     acc_mom_l_output << std::setprecision(global_precision);
 
-    total_mass_balance_v_output << std::setprecision(global_precision);
-    total_mass_balance_l_output << std::setprecision(global_precision);
+    bal_mass_v_output << std::setprecision(global_precision);
+    bal_mass_l_output << std::setprecision(global_precision);
 
-    total_heat_balance_v_output << std::setprecision(global_precision);
-    total_heat_balance_l_output << std::setprecision(global_precision);
+    bal_energy_v_output << std::setprecision(global_precision);
+    bal_energy_l_output << std::setprecision(global_precision);
 
-    global_heat_balance_output << std::setprecision(global_precision);
-    total_heat_balance_w_output << std::setprecision(global_precision);
+    bal_mom_v_output << std::setprecision(global_precision);
+    bal_mom_l_output << std::setprecision(global_precision);
+
+    diff_mass_v_output << std::setprecision(global_precision);
+    diff_mass_l_output << std::setprecision(global_precision);
+
+    diff_energy_v_output << std::setprecision(global_precision);
+    diff_energy_l_output << std::setprecision(global_precision);
+
+    diff_mom_v_output << std::setprecision(global_precision);
+    diff_mom_l_output << std::setprecision(global_precision);
+
+    acc_energy_w_output << std::setprecision(global_precision);
+    bal_energy_w_output << std::setprecision(global_precision);
+    diff_energy_w_output << std::setprecision(global_precision);
+
+    global_energy_balance_output << std::setprecision(global_precision);
 
     power_residual_wx_output << std::setprecision(global_precision);
     power_residual_xv_output << std::setprecision(global_precision);
@@ -451,11 +481,7 @@ int main() {
 
     std::vector<double> power_residual_xv(N, 0.0);
 
-    std::vector<double> heat_balance_wall(N, 0.0);
-    std::vector<double> heat_balance_wick(N, 0.0);
-    std::vector<double> heat_balance_vapor(N, 0.0);
-
-    std::vector<double> pressure_work_m(N, 0.0);
+    // ------ Properties
 
     std::vector<double> cp_m(N, 0.0);
     std::vector<double> cp_m_old(N, 0.0);
@@ -2135,16 +2161,16 @@ int main() {
                         << " flux_fN=" << flux_l_fN << " balance=" << accum_l_N + flux_l_fN - flux_l_fNm1 << std::endl;
 
                     // --- Combined: physical domain + ghost cells ---
-                    double total_accum_m = accum_m_0 + accum_m_N;
-                    double total_accum_l = accum_l_0 + accum_l_N;
+                    double acc_mass_m= accum_m_0 + accum_m_N;
+                    double acc_mass_l = accum_l_0 + accum_l_N;
                     for (int i = 1; i < N - 1; ++i) {
-                        total_accum_m += (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
-                        total_accum_l += eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
+                        acc_mass_m+= (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
+                        acc_mass_l += eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
                     }
                     std::cout << "  ALL CELLS (physical + ghost):" << std::endl;
-                    std::cout << "    Vapor total accum:  " << total_accum_m << std::endl;
-                    std::cout << "    Liquid total accum: " << total_accum_l << std::endl;
-                    std::cout << "    Total accum:        " << total_accum_m + total_accum_l << std::endl;
+                    std::cout << "    Vapor total accum:  " << acc_mass_m<< std::endl;
+                    std::cout << "    Liquid total accum: " << acc_mass_l << std::endl;
+                    std::cout << "    Total accum:        " << acc_mass_m+ acc_mass_l << std::endl;
                 }
 
                 */
@@ -2159,16 +2185,16 @@ int main() {
                     std::cout << "\n  --- LIQUID ---" << std::endl;
                     std::cout << std::setw(4) << "i" << std::setw(16) << "accumulation" << std::endl;
 
-                    double total_accum_l = 0;
+                    double acc_mass_l = 0;
 
                     for (int i = 1; i < N - 1; ++i) {
                         double accum = eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
-                        total_accum_l += accum;
+                        acc_mass_l += accum;
                         std::cout << std::setw(4) << i
                             << std::setw(16) << std::scientific << std::setprecision(4) << accum << std::endl;
                     }
 
-                    std::cout << "  Total accum: " << total_accum_l << std::endl;
+                    std::cout << "  Total accum: " << acc_mass_l << std::endl;
 
                     std::cout << "\n  Convective fluxes at faces:" << std::endl;
                     std::cout << std::setw(6) << "face" << std::setw(16) << "flux" << std::endl;
@@ -2203,20 +2229,20 @@ int main() {
                     std::cout << "  Boundary check (face[N-1] - face[1]): " << face_flux_l[N - 1] - face_flux_l[1] << std::endl;
                     std::cout << "  Telescoping error: " << total_net_l - (face_flux_l[N - 1] - face_flux_l[1]) << std::endl;
                     std::cout << "  Net flux (in - out): " << total_flux_l << std::endl;
-                    std::cout << "  Balance (accum - net flux): " << total_accum_l - total_flux_l << std::endl;
+                    std::cout << "  Balance (accum - net flux): " << acc_mass_l - total_flux_l << std::endl;
 
                     // --- VAPOR ---
                     std::cout << "\n  --- VAPOR ---" << std::endl;
                     std::cout << std::setw(4) << "i"
                         << std::setw(16) << "accumulation" << std::endl;
-                    double total_accum_m = 0;
+                    double acc_mass_m= 0;
                     for (int i = 1; i < N - 1; ++i) {
                         double accum = (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
-                        total_accum_m += accum;
+                        acc_mass_m+= accum;
                         std::cout << std::setw(4) << i
                             << std::setw(16) << std::scientific << std::setprecision(4) << accum << std::endl;
                     }
-                    std::cout << "  Total accum: " << total_accum_m << std::endl;
+                    std::cout << "  Total accum: " << acc_mass_m<< std::endl;
 
                     std::cout << "\n  Convective fluxes at faces:" << std::endl;
                     std::cout << std::setw(6) << "face"
@@ -2250,12 +2276,12 @@ int main() {
                     std::cout << "  Boundary check (face[N-1] - face[1]): " << face_flux_m[N - 1] - face_flux_m[1] << std::endl;
                     std::cout << "  Telescoping error: " << total_net_m - (face_flux_m[N - 1] - face_flux_m[1]) << std::endl;
                     std::cout << "  Net flux (in - out): " << total_flux_m << std::endl;
-                    std::cout << "  Balance (accum - net flux): " << total_accum_m - total_flux_m << std::endl;
+                    std::cout << "  Balance (accum - net flux): " << acc_mass_m- total_flux_m << std::endl;
 
                     std::cout << "\n  --- TOTAL ---" << std::endl;
-                    std::cout << "  Total accum: " << total_accum_m + total_accum_l << std::endl;
+                    std::cout << "  Total accum: " << acc_mass_m+ acc_mass_l << std::endl;
                     std::cout << "  Total net flux: " << total_flux_m + total_flux_l << std::endl;
-                    std::cout << "  Total balance: " << (total_accum_m + total_accum_l) - (total_flux_m + total_flux_l) << std::endl;
+                    std::cout << "  Total balance: " << (acc_mass_m+ acc_mass_l) - (total_flux_m + total_flux_l) << std::endl;
                 }
 
                 */
@@ -2275,21 +2301,21 @@ int main() {
                     std::cout << std::setw(4) << "i"
                         << std::setw(20) << "accumulation" << std::endl;
 
-                    double total_accum_el = 0.0;
+                    double acc_energy_l = 0.0;
 
                     for (int i = 1; i < N - 1; ++i) {
                         double e_now = eps_v * alpha_l[i] * rho_l[i] * cp_l * T_l[i];
                         double e_old = eps_v * alpha_l_old[i] * rho_l_old[i] * cp_l_old * T_l_old[i];
 
                         double accum = (e_now - e_old) / dt * dz;
-                        total_accum_el += accum;
+                        acc_energy_l += accum;
 
                         std::cout << std::setw(4) << i
                             << std::setw(20) << std::scientific << std::setprecision(6)
                             << accum << std::endl;
                     }
 
-                    std::cout << "  Total accum: " << total_accum_el << std::endl;
+                    std::cout << "  Total accum: " << acc_energy_l << std::endl;
 
                     std::cout << "\n  Convective energy fluxes at faces:" << std::endl;
 
@@ -2328,7 +2354,7 @@ int main() {
                     std::cout << "  Telescoping error: "
                         << total_net_el - (face_flux_el[N - 1] - face_flux_el[1]) << std::endl;
                     std::cout << "  Balance (accum + net flux): "
-                        << total_accum_el + total_net_el << std::endl;
+                        << acc_energy_l + total_net_el << std::endl;
 
                     const double cp_m = vapor_sodium::cp_g_linear();
                     const double cp_m_old = vapor_sodium::cp_g_linear();
@@ -2340,21 +2366,21 @@ int main() {
                     std::cout << std::setw(4) << "i"
                         << std::setw(20) << "accumulation" << std::endl;
 
-                    double total_accum_em = 0.0;
+                    double acc_energy_m = 0.0;
 
                     for (int i = 1; i < N - 1; ++i) {
                         double e_now = alpha_m[i] * rho_m[i] * cp_m * T_m[i];
                         double e_old = alpha_m_old[i] * rho_m_old[i] * cp_m_old * T_m_old[i];
 
                         double accum = (e_now - e_old) / dt * dz;
-                        total_accum_em += accum;
+                        acc_energy_m += accum;
 
                         std::cout << std::setw(4) << i
                             << std::setw(20) << std::scientific << std::setprecision(6)
                             << accum << std::endl;
                     }
 
-                    std::cout << "  Total accum: " << total_accum_em << std::endl;
+                    std::cout << "  Total accum: " << acc_energy_m << std::endl;
 
                     std::cout << "\n  Convective energy fluxes at faces:" << std::endl;
 
@@ -2393,16 +2419,16 @@ int main() {
                     std::cout << "  Telescoping error: "
                         << total_net_em - (face_flux_em[N - 1] - face_flux_em[1]) << std::endl;
                     std::cout << "  Balance (accum + net flux): "
-                        << total_accum_em + total_net_em << std::endl;
+                        << acc_energy_m + total_net_em << std::endl;
 
                     // =========================================================
                     // TOTAL ENERGY
                     // =========================================================
                     std::cout << "\n  --- TOTAL ENERGY ---" << std::endl;
-                    std::cout << "  Total accum: " << total_accum_el + total_accum_em << std::endl;
+                    std::cout << "  Total accum: " << acc_energy_l + acc_energy_m << std::endl;
                     std::cout << "  Total net flux: " << total_net_el + total_net_em << std::endl;
                     std::cout << "  Total balance: "
-                        << (total_accum_el + total_accum_em) + (total_net_el + total_net_em)
+                        << (acc_energy_l + acc_energy_m) + (total_net_el + total_net_em)
                         << std::endl;
                 }
 
@@ -2423,7 +2449,7 @@ int main() {
                         << std::setw(20) << "pressure"
                         << std::setw(20) << "residual" << std::endl;
 
-                    double total_accum_mm = 0.0, total_conv_mm = 0.0, total_pres_mm = 0.0;
+                    double acc_mom_m = 0.0, total_conv_mm = 0.0, total_pres_mm = 0.0;
 
                     // Momentum equation at face i (v_m[i]), between cell i-1 and cell i
                     for (int i = 2; i < N - 1; ++i) {
@@ -2449,7 +2475,7 @@ int main() {
 
                         double residual = accum + conv + pres;
 
-                        total_accum_mm += accum * dz;
+                        acc_mom_m += accum * dz;
                         total_conv_mm += conv * dz;
                         total_pres_mm += pres * dz;
 
@@ -2460,10 +2486,10 @@ int main() {
                             << std::setw(20) << residual * dz << std::endl;
                     }
 
-                    std::cout << "  Total accum: " << total_accum_mm << std::endl;
+                    std::cout << "  Total accum: " << acc_mom_m << std::endl;
                     std::cout << "  Total conv:  " << total_conv_mm << std::endl;
                     std::cout << "  Total pres:  " << total_pres_mm << std::endl;
-                    std::cout << "  Total residual: " << total_accum_mm + total_conv_mm + total_pres_mm << std::endl;
+                    std::cout << "  Total residual: " << acc_mom_m + total_conv_mm + total_pres_mm << std::endl;
 
                     // =========================================================
                     // LIQUID MOMENTUM
@@ -2475,7 +2501,7 @@ int main() {
                         << std::setw(20) << "pressure"
                         << std::setw(20) << "residual" << std::endl;
 
-                    double total_accum_ml = 0.0, total_conv_ml = 0.0, total_pres_ml = 0.0;
+                    double acc_mom_l = 0.0, total_conv_ml = 0.0, total_pres_ml = 0.0;
 
                     for (int i = 2; i < N - 1; ++i) {
                         // Accumulation
@@ -2500,7 +2526,7 @@ int main() {
 
                         double residual = accum + conv + pres;
 
-                        total_accum_ml += accum * dz;
+                        acc_mom_l += accum * dz;
                         total_conv_ml += conv * dz;
                         total_pres_ml += pres * dz;
 
@@ -2511,20 +2537,20 @@ int main() {
                             << std::setw(20) << residual * dz << std::endl;
                     }
 
-                    std::cout << "  Total accum: " << total_accum_ml << std::endl;
+                    std::cout << "  Total accum: " << acc_mom_l << std::endl;
                     std::cout << "  Total conv:  " << total_conv_ml << std::endl;
                     std::cout << "  Total pres:  " << total_pres_ml << std::endl;
-                    std::cout << "  Total residual: " << total_accum_ml + total_conv_ml + total_pres_ml << std::endl;
+                    std::cout << "  Total residual: " << acc_mom_l + total_conv_ml + total_pres_ml << std::endl;
 
                     // =========================================================
                     // TOTAL MOMENTUM
                     // =========================================================
                     std::cout << "\n  --- TOTAL MOMENTUM ---" << std::endl;
-                    std::cout << "  Total accum: " << total_accum_mm + total_accum_ml << std::endl;
+                    std::cout << "  Total accum: " << acc_mom_m + acc_mom_l << std::endl;
                     std::cout << "  Total conv:  " << total_conv_mm + total_conv_ml << std::endl;
                     std::cout << "  Total pres:  " << total_pres_mm + total_pres_ml << std::endl;
                     std::cout << "  Total residual: "
-                        << (total_accum_mm + total_accum_ml) + (total_conv_mm + total_conv_ml) + (total_pres_mm + total_pres_ml)
+                        << (acc_mom_m + acc_mom_l) + (total_conv_mm + total_conv_ml) + (total_pres_mm + total_pres_ml)
                         << std::endl;
                 }
 
@@ -2658,85 +2684,116 @@ int main() {
                     power_residual_xv_output << power_residual_xv[i] << " ";
                 }
 
-                // Check mass, energy and momentum balances for the phases
+                // Check mass, energy and momentum accumulators, balances and differences for each of the phases
 
-                double total_accum_m = 0;
-                double total_accum_l = 0;
+                double acc_mass_m = 0;
+                double acc_mass_l = 0;
 
-                double total_accum_em = 0.0;
-                double total_accum_el = 0.0;
+                double acc_energy_m = 0.0;
+                double acc_energy_l = 0.0;
 
-                double total_accum_mm = 0.0;
-                double total_accum_ml = 0.0;
+                double acc_mom_m = 0.0;
+                double acc_mom_l = 0.0;
 
-                double global_heat = 0.0;
-                double total_mass_v = 0.0;
-                double total_mass_l = 0.0;
-                double total_heat_v = 0.0;
-                double total_heat_l = 0.0;
-                double total_heat_w = 0.0;
+                double bal_mass_m = 0;
+                double bal_mass_l = 0;
+
+                double bal_energy_m = 0.0;
+                double bal_energy_l = 0.0;
+
+                double bal_mom_m = 0.0;
+                double bal_mom_l = 0.0;
+
+                double diff_mass_m = 0;
+                double diff_mass_l = 0;
+
+                double diff_energy_m = 0.0;
+                double diff_energy_l = 0.0;
+
+                double diff_mom_m = 0.0;
+                double diff_mom_l = 0.0;
+
+                double acc_energy_w = 0.0;
+                double bal_energy_w = 0.0;
+                double diff_energy_w = 0.0;
+
+                double global_energy_balance = 0.0;
 
                 for (int i = 1; i < N - 1; ++i) {
 
-                    double accum_m = (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz;
-                    total_accum_m += accum_m;
+                    // ----- Accumulators
 
-                    double accum_l = eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz;
-                    total_accum_l += accum_l;
+                    acc_mass_m += (alpha_m[i] * rho_m[i] - alpha_m_old[i] * rho_m_old[i]) / dt * dz * (M_PI * r_v * r_v * dz);
+                    acc_mass_l += eps_v * (alpha_l[i] * rho_l[i] - alpha_l_old[i] * rho_l_old[i]) / dt * dz * (M_PI * r_v * r_v * dz);
 
                     double e_now_l = eps_v * alpha_l[i] * rho_l[i] * cp_l[i] * T_l[i];
                     double e_old_l = eps_v * alpha_l_old[i] * rho_l_old[i] * cp_l_old[i] * T_l_old[i];
 
-                    double accum_el = (e_now_l - e_old_l) / dt * dz;
-                    total_accum_el += accum_el;
+                    acc_energy_l += (e_now_l - e_old_l) / dt * dz * (M_PI * r_v * r_v * dz);
 
                     double e_now_m = alpha_m[i] * rho_m[i] * cp_m[i] * T_m[i];
                     double e_old_m = alpha_m_old[i] * rho_m_old[i] * cp_m_old[i] * T_m_old[i];
 
-                    double accum_em = (e_now_m - e_old_m) / dt * dz;
-                    total_accum_em += accum_em;
+                    acc_energy_m += (e_now_m - e_old_m) / dt * dz * (M_PI * r_v * r_v * dz);
 
                     double arho_new_mm = (alpha_m[i - 1] * rho_m[i - 1] + alpha_m[i] * rho_m[i]) / 2.0;
                     double arho_old_mm = (alpha_m_old[i - 1] * rho_m_old[i - 1] + alpha_m_old[i] * rho_m_old[i]) / 2.0;
-                    double accum_mm = (arho_new_mm * v_m[i] - arho_old_mm * v_m_old[i]) / dt;
 
-                    total_accum_mm += accum_mm * dz;
+                    acc_mom_m += (arho_new_mm * v_m[i] - arho_old_mm * v_m_old[i]) / dt * dz * (M_PI * r_v * r_v * dz);
 
                     double arho_new_ml = eps_v * (alpha_l[i - 1] * rho_l[i - 1] + alpha_l[i] * rho_l[i]) / 2.0;
                     double arho_old_ml = eps_v * (alpha_l_old[i - 1] * rho_l_old[i - 1] + alpha_l_old[i] * rho_l_old[i]) / 2.0;
-                    double accum_ml = (arho_new_ml * v_l[i] - arho_old_ml * v_l_old[i]) / dt;
 
-                    total_accum_ml += accum_ml * dz;
+                    acc_mom_l += (arho_new_ml * v_l[i] - arho_old_ml * v_l_old[i]) / dt * dz * (M_PI * r_v * r_v * dz);
 
+                    acc_energy_w += q_pp[i] * (2 * M_PI * r_o * dz) + power_flux_xw[i] * M_PI * (r_o * r_o - r_i * r_i);
 
-
-                    heat_balance_wall[i] = q_pp[i] * (2 * M_PI * r_o * dz) + power_flux_xw[i] * M_PI * (r_o * r_o - r_i * r_i);
-                    heat_balance_wick[i] = (power_mass_vx[i] + power_flux_vx[i] + power_flux_wx[i]) * M_PI * r_i * r_i;
-                    heat_balance_vapor[i] = (power_mass_xv[i] + power_flux_xv[i]) * M_PI * r_i * r_i;
-
-                    // Check global heat balance
-
-                    global_heat += q_pp[i] * (2 * M_PI * r_o * dz);
+                    // ---------- Balances
 
                     // Check total mass vapor sources
 
-                    total_mass_v += Gamma_xv_lin[i] * (M_PI * r_v * r_v * dz);
+                    bal_mass_m += Gamma_xv_lin[i] * (M_PI * r_v * r_v * dz);
 
                     // Check total mass liquid sources
 
-                    total_mass_l += -Gamma_xv_lin[i] * (M_PI * r_v * r_v * dz);
+                    bal_mass_l += -Gamma_xv_lin[i] * (M_PI * r_v * r_v * dz);
 
                     // Check total heat vapor sources
 
-                    total_heat_v += (+power_flux_xv[i] + power_mass_xv[i]) * (M_PI * r_v * r_v * dz);
+                    bal_energy_m += (power_flux_xv[i] + power_mass_xv[i]) * (M_PI * r_v * r_v * dz);
 
                     // Check total heat liquid sources
 
-                    total_heat_l += (+power_flux_vx[i] + power_mass_vx[i]) * (M_PI * r_v * r_v * dz);
+                    bal_energy_l += (power_flux_vx[i] + power_mass_vx[i]) * (M_PI * r_v * r_v * dz);
+
+                    // Check total momentum sources vapor
+
+                    bal_mom_m += (p_m[i] - p_m[i - 1]) * (alpha_m_iter[i - 1] + alpha_m_iter[i]) / (2 * dz) * (M_PI * r_v * r_v * dz);
+
+                    // Check total momentum sources liquid
+
+                    bal_mom_l += (p_l[i] - p_l[i - 1]) * (alpha_l_iter[i - 1] + alpha_l_iter[i]) / (2 * dz) * (M_PI * r_v * r_v * dz);
 
                     // Check total heat wall sources
 
-                    total_heat_w += q_pp[i] * (2 * M_PI * r_o * dz) + power_flux_xw[i] * M_PI * (r_o * r_o - r_i * r_i);
+                    bal_energy_w += q_pp[i] * (2 * M_PI * r_o * dz) + power_flux_xw[i] * M_PI * (r_o * r_o - r_i * r_i);
+                
+                    // Check total external heat sources
+
+                    global_energy_balance += q_pp[i] * (2 * M_PI * r_o * dz);
+
+                    // --------- Differences
+
+                    diff_mass_m += (acc_mass_m - bal_mass_m);
+                    diff_mass_l += (acc_mass_l - bal_mass_l);
+
+                    diff_energy_m += (acc_energy_m - bal_energy_m);
+                    diff_energy_l += (acc_energy_l - bal_energy_l);
+
+                    diff_mom_m += (acc_mom_m - bal_mom_m);
+                    diff_mom_l += (acc_mom_l - bal_mom_l);
+
+                    diff_energy_w += (acc_energy_w - bal_energy_w);
                 }
 
                 time_output << time_total << " ";
@@ -2744,23 +2801,38 @@ int main() {
                 simulation_time_output << simulation_time << " ";
                 clock_time_output << clock_time << " ";
 
-                acc_mass_v_output << total_accum_m << " ";
-                acc_mass_l_output << total_accum_l << " ";
+                acc_mass_v_output << acc_mass_m << " ";
+                acc_mass_l_output << acc_mass_l << " ";
 
-                acc_energy_v_output << total_accum_em << " ";
-                acc_energy_l_output << total_accum_el << " ";
+                acc_energy_v_output << acc_energy_m << " ";
+                acc_energy_l_output << acc_energy_l << " ";
 
-                acc_mom_v_output << total_accum_mm << " ";
-                acc_mom_l_output << total_accum_ml << " ";
+                acc_mom_v_output << acc_mom_m << " ";
+                acc_mom_l_output << acc_mom_l << " ";
 
-                total_mass_balance_v_output << total_mass_v << " ";
-                total_mass_balance_l_output << total_mass_l << " ";
+                bal_mass_v_output << bal_mass_m << " ";
+                bal_mass_l_output << bal_mass_l << " ";
 
-                total_heat_balance_v_output << total_heat_v << " ";
-                total_heat_balance_l_output << total_heat_l << " ";
+                bal_energy_v_output << bal_energy_m << " ";
+                bal_energy_l_output << bal_energy_l << " ";
 
-                global_heat_balance_output << global_heat << " ";
-                total_heat_balance_w_output << total_heat_w << " ";
+                bal_mom_v_output << bal_mom_m << " ";
+                bal_mom_l_output << bal_mom_l << " ";
+
+                diff_mass_v_output << diff_mass_m << " ";
+                diff_mass_l_output << diff_mass_l << " ";
+
+                diff_energy_v_output << diff_energy_m << " ";
+                diff_energy_l_output << diff_energy_l << " ";
+
+                diff_mom_v_output << diff_mom_m << " ";
+                diff_mom_l_output << diff_mom_l << " ";
+
+                acc_energy_w_output << acc_energy_w << " ";
+                bal_energy_w_output << bal_energy_w << " ";
+                diff_energy_w_output << diff_energy_w << " ";
+
+                global_energy_balance_output << global_energy_balance << " ";
 
                 v_velocity_output << "\n";
                 v_pressure_output << "\n";
@@ -2852,14 +2924,29 @@ int main() {
                 acc_mom_v_output.flush();
                 acc_mom_l_output.flush();
 
-                total_mass_balance_v_output.flush();
-                total_mass_balance_l_output.flush();
+                bal_mass_v_output.flush();
+                bal_mass_l_output.flush();
 
-                total_heat_balance_v_output.flush();
-                total_heat_balance_l_output.flush();
+                bal_energy_v_output.flush();
+                bal_energy_l_output.flush();
 
-                global_heat_balance_output.flush();
-                total_heat_balance_w_output.flush();
+                bal_mom_v_output.flush();
+                bal_mom_l_output.flush();
+
+                diff_mass_v_output.flush();
+                diff_mass_l_output.flush();
+
+                diff_energy_v_output.flush();
+                diff_energy_l_output.flush();
+
+                diff_mom_v_output.flush();
+                diff_mom_l_output.flush();
+
+                acc_energy_w_output.flush();
+                bal_energy_w_output.flush();
+                diff_energy_w_output.flush();
+
+                global_energy_balance_output.flush();
 
                 power_residual_wx_output.flush();
                 power_residual_xv_output.flush();
@@ -2955,14 +3042,29 @@ int main() {
     acc_mom_v_output.close();
     acc_mom_l_output.close();
 
-    total_mass_balance_v_output.close();
-    total_mass_balance_l_output.close();
+    bal_mass_v_output.close();
+    bal_mass_l_output.close();
 
-    total_heat_balance_v_output.close();
-    total_heat_balance_l_output.close();
+    bal_energy_v_output.close();
+    bal_energy_l_output.close();
 
-    global_heat_balance_output.close();
-    total_heat_balance_w_output.close();
+    bal_mom_v_output.close();
+    bal_mom_l_output.close();
+
+    diff_mass_v_output.close();
+    diff_mass_l_output.close();
+
+    diff_energy_v_output.close();
+    diff_energy_l_output.close();
+
+    diff_mom_v_output.close();
+    diff_mom_l_output.close();
+
+    acc_energy_w_output.close();
+    bal_energy_w_output.close();
+    diff_energy_w_output.close();
+
+    global_energy_balance_output.close();
 
     power_residual_wx_output.close();
     power_residual_xv_output.close();
