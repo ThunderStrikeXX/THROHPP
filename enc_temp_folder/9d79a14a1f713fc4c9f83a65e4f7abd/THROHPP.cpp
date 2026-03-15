@@ -2053,7 +2053,115 @@ int main() {
 
             if (conv_all) {
 
+                {
+                    std::cout << "=== VAPOR MASS LINEARIZED CELL-BY-CELL ===" << std::endl;
+                    std::cout << std::setw(4) << "i"
+                        << std::setw(16) << "accum"
+                        << std::setw(16) << "conv_D"
+                        << std::setw(16) << "conv_L"
+                        << std::setw(16) << "conv_R"
+                        << std::setw(16) << "conv_Q"
+                        << std::setw(16) << "source"
+                        << std::setw(16) << "residual" << std::endl;
 
+                    double total_accum = 0, total_conv = 0, total_source = 0;
+
+                    for (int i = 1; i < N - 1; ++i) {
+
+                        // --- Accumulation D ---
+                        double accum_D =
+                            (alpha_m_iter[i] / dt) * rho_m[i]
+                            + (rho_m_iter[i] / dt) * alpha_m[i];
+
+                        // --- Accumulation Q ---
+                        double accum_Q =
+                            (rho_m_old[i] * alpha_m_old[i]) / dt
+                            + (rho_m_iter[i] * alpha_m_iter[i]) / dt;
+
+                        double accum = accum_D - accum_Q;
+
+                        // --- Convection D (cell i) ---
+                        double conv_D_rho = (0.0
+                            + (alpha_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
+                            - (alpha_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                            ) * rho_m[i];
+
+                        double conv_D_alpha = (0.0
+                            + (rho_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
+                            - (rho_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                            ) * alpha_m[i];
+
+                        double conv_D_v = (0.0
+                            - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * H(v_m_iter[i])) / dz
+                            - (alpha_m_iter[i] * rho_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                            ) * v_m[i];
+
+                        double conv_D = conv_D_rho + conv_D_alpha + conv_D_v;
+
+                        // --- Convection L (cell i-1) ---
+                        double conv_L_rho = (0.0
+                            - (alpha_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])) / dz
+                            ) * rho_m[i - 1];
+
+                        double conv_L_alpha = (0.0
+                            - (rho_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])) / dz
+                            ) * alpha_m[i - 1];
+
+                        double conv_L = conv_L_rho + conv_L_alpha;
+
+                        // --- Convection R (cell i+1) ---
+                        double conv_R_rho = (0.0
+                            + (alpha_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
+                            ) * rho_m[i + 1];
+
+                        double conv_R_alpha = (0.0
+                            + (rho_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
+                            ) * alpha_m[i + 1];
+
+                        double conv_R_v = (0.0
+                            + (alpha_m_iter[i] * rho_m_iter[i] * H(v_m_iter[i + 1])) / dz
+                            + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
+                            ) * v_m[i + 1];
+
+                        double conv_R = conv_R_rho + conv_R_alpha + conv_R_v;
+
+                        // --- Convection Q ---
+                        double conv_Q = -2 * (
+                            +alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])
+                            + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))
+                            - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])
+                            - alpha_m_iter[i] * rho_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))
+                            ) / dz;
+
+                        double conv_total = conv_D + conv_L + conv_R - conv_Q;
+
+                        // --- Source ---
+                        double source =
+                            (C36[i]) * p_m[i]
+                            + (C37[i]) * T_m[i]
+                            + (C38[i]) * T_l[i]
+                            + (C39[i]) * T_w[i]
+                            + C40[i];
+
+                        double residual = accum + conv_total - source;
+
+                        total_accum += accum * dz;
+                        total_conv += conv_total * dz;
+                        total_source += source * dz;
+
+                        std::cout << std::setw(4) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << accum * dz
+                            << std::setw(16) << conv_D * dz
+                            << std::setw(16) << conv_L * dz
+                            << std::setw(16) << conv_R * dz
+                            << std::setw(16) << conv_Q * dz
+                            << std::setw(16) << source * dz
+                            << std::setw(16) << residual * dz << std::endl;
+                    }
+                    std::cout << "TOTAL accum=" << total_accum << " conv=" << total_conv
+                        << " source=" << total_source
+                        << " residual=" << total_accum + total_conv - total_source << std::endl;
+                }
 
                 halves = std::min(0, --halves);             // Reset halves if Picard converged
                 break;                  // Picard converged, so break the loops
