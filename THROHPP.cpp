@@ -81,7 +81,7 @@ int main() {
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-8;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-10;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
     double time_simulation = 5000;                      // 
     double time_total = 0.0;                            /// Total time elapsed [s]
@@ -91,18 +91,18 @@ int main() {
 
     // Picard loops parameters	          
     int pic = 0;                                        /// Number of Picard iterations [-]
-    const int max_picard = 15;                         /// Maximum number of Picard iterations per timestep [-]
+    const int max_picard = 50;                         /// Maximum number of Picard iterations per timestep [-]
     std::array<double, B> L_pic;                        /// Picard residuals [-]
     std::array<bool, B> conv_var;                       /// Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   /// Tolerance for the convergence of Picard loop [-]
-        1e-4,  // rho_m
-        1e-4,  // rho_l
+        1e-6,  // rho_m
+        1e-6,  // rho_l
         1e-4,  // alpha_m
         1e-4,  // alpha_l
         1e-2,  // p_m
         1e-2,  // p_l
-        1e-2,  // v_m
-        1e-2,  // v_l
+        1e-6,  // v_m
+        1e-6,  // v_l
         1e-4,  // T_m
         1e-4,  // T_l
         1e-4   // T_w
@@ -163,7 +163,7 @@ int main() {
     double h_xv_v;                                                  /// Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
     double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
-    const double T_left = 1000.0;                        /// First node initialization temperature [K]
+    const double T_left = 1100.0;                        /// First node initialization temperature [K]
     const double T_right = 900.0;                       /// Last node initialization temperature [K]
 
     // Temperatures initialization
@@ -179,6 +179,10 @@ int main() {
 
         p_m[i] = vapor_sodium::P_sat(T_m[i]);
         p_l[i] = p_m[i];
+
+        rho_m[i] = p_m[i] / (T_m[i] * Rv);
+        rho_l[i] = 219 + 275.32 * (1 - T_l[i] / Tc) + 511.58 * std::pow((1 - T_l[i] / Tc), 0.5);
+
     }
 
     v_l[0] = 0.0;
@@ -537,7 +541,9 @@ int main() {
         auto t_start_timestep = std::chrono::high_resolution_clock::now();
 
         // Timestep selection
-        dt = std::max(dt_user * pow(0.5, halves), 1e-10);    // Halfing of the timestep up to a lower bound     
+        dt = dt_user * pow(0.5, halves);    // Halfing of the timestep up to a lower bound     
+
+        if (dt < 1e-12) return 1;
 
         // Updating all properties
         for (std::size_t i = 0; i < N; ++i) {
@@ -576,20 +582,7 @@ int main() {
                 R[i].row.clear(); R[i].col.clear(); R[i].val.clear();
             }
 
-            /// Picard --> iter = new
-            rho_m_iter = rho_m;
-            rho_l_iter = rho_l;
-            alpha_m_iter = alpha_m;
-            alpha_l_iter = alpha_l;
-            p_m_iter = p_m;
-            p_l_iter = p_l;
-            v_m_iter = v_m;
-            v_l_iter = v_l;
-            T_m_iter = T_m;
-            T_l_iter = T_l;
-            T_w_iter = T_w;
-
-            T_sur_iter = T_sur;
+            // Forcing boundary conditions
 
             v_m_iter[0] = 0.0;   // BC ingresso
             v_m_iter[N] = 0.0;   // BC uscita
@@ -602,6 +595,30 @@ int main() {
 
             v_l[0] = 0.0;
             v_l[N] = 0.0;
+
+            T_m_iter[0] = T_m_iter[1];
+            T_l_iter[0] = T_l_iter[1];
+
+            T_m_iter[N - 1] = T_m_iter[N - 2];
+            T_l_iter[N - 1] = T_l_iter[N - 2];
+
+            alpha_m_iter[0] = alpha_m_iter[1];
+            alpha_l_iter[0] = alpha_l_iter[1];
+
+            alpha_m_iter[N - 1] = alpha_m_iter[N - 2];
+            alpha_l_iter[N - 1] = alpha_l_iter[N - 2];
+
+            rho_m_iter[0] = rho_m_iter[1];
+            rho_l_iter[0] = rho_l_iter[1];
+
+            rho_m_iter[N - 1] = rho_m_iter[N - 2];
+            rho_l_iter[N - 1] = rho_l_iter[N - 2];
+
+            p_m_iter[0] = p_m_iter[1];
+            p_l_iter[0] = p_l_iter[1];
+
+            p_m_iter[N - 1] = p_m_iter[N - 2];
+            p_l_iter[N - 1] = p_l_iter[N - 2];
 
             // Space discretization loop
             for (int i = 1; i < N - 1; ++i) {
@@ -640,7 +657,7 @@ int main() {
 
                 }
                 else {
-
+                     
                     // Condensation case
                     h_xv_v = vapor_sodium::h_g_linear(T_m_iter[i]);
                     h_vx_x = liquid_sodium::h_l_linear(T_sur_iter[i])
@@ -1637,7 +1654,7 @@ int main() {
                 );
 
                 add(D[i], 8, 9,
-                    -1.0 / Tc * (275.32 + 511.58 / (2 * std::sqrt(1 - T_l_iter[i] / Tc)))
+                    +1.0 / Tc * (275.32 + 511.58 / (2 * std::sqrt(1 - T_l_iter[i] / Tc)))
                 );
 
                 Q[i][8] = 219.0 + 275.32 * (1.0 - T_l_iter[i] / Tc) + 511.58 * std::sqrt(1.0 - T_l_iter[i] / Tc) + T_l_iter[i] / Tc * (275.32 + 511.58 / (2 * std::sqrt(1.0 - T_l_iter[i] / Tc)));
@@ -2020,6 +2037,33 @@ int main() {
             for (int k = 0; k < B; ++k)
                 conv_all = conv_all && conv_var[k];
 
+            /// Picard --> iter = new
+            rho_m_iter = rho_m;
+            rho_l_iter = rho_l;
+            alpha_m_iter = alpha_m;
+            alpha_l_iter = alpha_l;
+            p_m_iter = p_m;
+            p_l_iter = p_l;
+            v_m_iter = v_m;
+            v_l_iter = v_l;
+            T_m_iter = T_m;
+            T_l_iter = T_l;
+            T_w_iter = T_w;
+
+            T_sur_iter = T_sur;
+
+            for (int i = 1; i < N; i++) {
+
+                power_flux_wx[i] = (C61[i] * p_m[i] + C62[i] * T_m[i] + C63[i] * T_l[i] + C64[i] * T_w[i] + C65[i]) * M_PI * (r_i * r_i) * dz;
+                power_flux_xw[i] = (C66[i] * p_m[i] + C67[i] * T_m[i] + C68[i] * T_l[i] + C69[i] * T_w[i] + C70[i]) * M_PI * (r_o * r_o - r_i * r_i) * dz;
+
+                power_flux_vx[i] = (C41[i] * p_m[i] + C42[i] * T_m[i] + C43[i] * T_l[i] + C44[i] * T_w[i] + C45[i]) * M_PI * (r_i * r_i) * dz;
+                power_flux_xv[i] = (C46[i] * p_m[i] + C47[i] * T_m[i] + C48[i] * T_l[i] + C49[i] * T_w[i] + C50[i]) * M_PI * (r_i * r_i) * dz;
+
+                power_mass_vx[i] = (C51[i] * p_m[i] + C52[i] * T_m[i] + C53[i] * T_l[i] + C54[i] * T_w[i] + C55[i]) * M_PI * (r_i * r_i) * dz;
+                power_mass_xv[i] = (C56[i] * p_m[i] + C57[i] * T_m[i] + C58[i] * T_l[i] + C59[i] * T_w[i] + C60[i]) * M_PI * (r_i * r_i) * dz;
+            }
+
             if (conv_all) {
 
                 halves = 0;             // Reset halves if Picard converged
@@ -2046,15 +2090,7 @@ int main() {
 
                 for (int i = 1; i < N - 1; ++i) {
 
-                    power_flux_wx[i] = (C61[i] * p_m[i] + C62[i] * T_m[i] + C63[i] * T_l[i] + C64[i] * T_w[i] + C65[i]) * M_PI * (r_i * r_i) * dz;
-                    power_flux_xw[i] = (C66[i] * p_m[i] + C67[i] * T_m[i] + C68[i] * T_l[i] + C69[i] * T_w[i] + C70[i]) * M_PI * (r_o * r_o - r_i * r_i) * dz;
-
-                    power_flux_vx[i] = (C41[i] * p_m[i] + C42[i] * T_m[i] + C43[i] * T_l[i] + C44[i] * T_w[i] + C45[i]) * M_PI * (r_i * r_i) * dz;
-                    power_flux_xv[i] = (C46[i] * p_m[i] + C47[i] * T_m[i] + C48[i] * T_l[i] + C49[i] * T_w[i] + C50[i]) * M_PI * (r_i * r_i) * dz;
-
-                    power_mass_vx[i] = (C51[i] * p_m[i] + C52[i] * T_m[i] + C53[i] * T_l[i] + C54[i] * T_w[i] + C55[i]) * M_PI * (r_i * r_i) * dz;
-                    power_mass_xv[i] = (C56[i] * p_m[i] + C57[i] * T_m[i] + C58[i] * T_l[i] + C59[i] * T_w[i] + C60[i]) * M_PI * (r_i * r_i) * dz;
-
+                    
                     v_velocity_output << X[i][6] << " ";
                     v_pressure_output << X[i][4] << " ";
                     v_temperature_output << X[i][8] << " ";
