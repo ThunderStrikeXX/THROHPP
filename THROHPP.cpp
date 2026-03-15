@@ -181,6 +181,16 @@ int main() {
         p_l[i] = p_m[i];
     }
 
+    v_l[0] = 0.0;
+    v_l[1] = 0.0;
+    v_l[N - 1] = 0.0;
+    v_l[N] = 0.0;
+
+    v_m[0] = 0.0;
+    v_m[1] = 0.0;
+    v_m[N - 1] = 0.0;
+    v_m[N] = 0.0;
+
     // Old variables
     std::vector<double> rho_m_old = rho_m;
     std::vector<double> rho_l_old = rho_l;
@@ -1531,7 +1541,7 @@ int main() {
                     + eps_v * ((1 - H(v_l_iter[i])) * rho_l_iter[i] * v_l_iter[i + 1] * v_l_iter[i + 1]) / dz
 
                     // Capillary term (central differences)
-                    - (DPcap[i] + DPcap[i + 1]) / (2 * dz)
+                    + (DPcap[i - 1] + DPcap[i]) / (2 * dz)
                 );
 
                 add(D[i], 6, 5, 0.0
@@ -1571,12 +1581,6 @@ int main() {
                         ) / dz
                     ;
 
-                add(L[i], 6, 3, 0.0
-
-                    // Capillary term (central differences)
-                    + (DPcap[i] + DPcap[i + 1]) / (2 * dz)
-                );
-
                 add(L[i], 6, 1, 0.0
 
                     // Temporal term (central differences)
@@ -1595,6 +1599,9 @@ int main() {
                     // Convective term
                     - eps_v * (H(v_l_iter[i]) * rho_l_iter[i - 1] * v_l_iter[i - 1] * v_l_iter[i - 1]) / dz
                     - eps_v * ((1 - H(v_l_iter[i])) * rho_l_iter[i - 1] * v_l_iter[i] * v_l_iter[i]) / dz
+
+                    // Capillary term (central differences)
+                    - (DPcap[i - 1] + DPcap[i]) / (2 * dz)
                 );
 
                 add(L[i], 6, 5, 0.0
@@ -1938,10 +1945,12 @@ int main() {
                     std::cout << "alpha_m_iter = " << alpha_m_iter[i] << std::endl;
                     std::cout << "T_sur_iter = " << T_sur_iter[i] << std::endl;
                     std::cout << "p_m_iter = " << p_m_iter[i] << std::endl;
-                    std::abort();
+                    
+                    return 1;
                 }
             }
 
+            /*
             if (time_total == 0) {
                 std::cout << "=== Time " << time_total << " Picard iter " << pic << " == = " << std::endl;
                 auto p = [](double v) {
@@ -1966,6 +1975,7 @@ int main() {
                         << std::setw(12) << p(T_w[i]) << std::endl;
                 }
             }
+            */
 
             bool valid_all = true;
             for (int i = 1; i < N - 1; ++i) {
@@ -2208,15 +2218,31 @@ int main() {
 
                     acc_energy_m += ((e_now_m - e_old_m) / dt * (M_PI * r_i * r_i * dz));
 
-                    double arho_new_mm = (alpha_m[i - 1] * rho_m[i - 1] + alpha_m[i] * rho_m[i]) / 2.0;
-                    double arho_old_mm = (alpha_m_old[i - 1] * rho_m_old[i - 1] + alpha_m_old[i] * rho_m_old[i]) / 2.0;
+                    // double arho_new_mm = (alpha_m[i - 1] * rho_m[i - 1] + alpha_m[i] * rho_m[i]) * v_m[i] / 2.0 / dt;
+                    // double arho_old_mm = (alpha_m_old[i - 1] * rho_m_old[i - 1] + alpha_m_old[i] * rho_m_old[i]) *  v_m_old[i] / 2.0 / dt;
 
-                    acc_mom_m += (arho_new_mm * v_m[i] - arho_old_mm * v_m_old[i]) / dt * dz * (M_PI * r_v * r_v * dz);
+                    double arho_new_mm = (+ (alpha_m_iter[i - 1] + alpha_m_iter[i]) * (rho_m[i - 1] + rho_m[i]) * v_m_iter[i] / (4 * dt)
+                                        + (rho_m_iter[i - 1] + rho_m_iter[i]) * (alpha_m[i - 1] + alpha_m[i]) * v_m_iter[i] / (4 * dt)
+                                        + (alpha_m_iter[i - 1] * rho_m_iter[i - 1] + alpha_m_iter[i] * rho_m_iter[i]) * v_m[i] / (2 * dt));
 
-                    double arho_new_ml = eps_v * (alpha_l[i - 1] * rho_l[i - 1] + alpha_l[i] * rho_l[i]) / 2.0;
-                    double arho_old_ml = eps_v * (alpha_l_old[i - 1] * rho_l_old[i - 1] + alpha_l_old[i] * rho_l_old[i]) / 2.0;
+                    double arho_old_mm = (+ (alpha_m_iter[i - 1] * rho_m_iter[i - 1] + alpha_m_iter[i] * rho_m_iter[i]) * v_m_old[i] / (2 * dt)
+                                        + ((alpha_m_iter[i - 1] + alpha_m_iter[i]) * v_m_iter[i] * (rho_m_old[i - 1] + rho_m_old[i])) / (4 * dt)
+                                        + ((rho_m_iter[i - 1] + rho_m_iter[i]) * v_m_iter[i] * (alpha_m_old[i - 1] + alpha_m_old[i]) / (4 * dt)));
 
-                    acc_mom_l += (arho_new_ml * v_l[i] - arho_old_ml * v_l_old[i]) / dt * dz * (M_PI * r_v * r_v * dz);
+                    acc_mom_m += (arho_new_mm - arho_old_mm) * (M_PI * r_v * r_v * dz);
+
+                    // double arho_new_ml = eps_v * (alpha_l[i - 1] * rho_l[i - 1] + alpha_l[i] * rho_l[i]) / 2.0;
+                    // double arho_old_ml = eps_v * (alpha_l_old[i - 1] * rho_l_old[i - 1] + alpha_l_old[i] * rho_l_old[i]) / 2.0;
+
+                    double arho_new_ml = eps_v * (+ (alpha_l_iter[i - 1] + alpha_l_iter[i]) * (rho_l[i - 1] + rho_l[i]) * v_l_iter[i] / (4 * dt)
+                                        + (rho_l_iter[i - 1] + rho_l_iter[i]) * (alpha_l[i - 1] + alpha_l[i]) * v_l_iter[i] / (4 * dt)
+                                        + (alpha_l_iter[i - 1] * rho_l_iter[i - 1] + alpha_l_iter[i] * rho_l_iter[i]) * v_l[i] / (2 * dt));
+
+                    double arho_old_ml = eps_v * (+ (alpha_l_iter[i - 1] * rho_l_iter[i - 1] + alpha_l_iter[i] * rho_l_iter[i]) * v_l_old[i] / (2 * dt)
+                                        + (alpha_l_iter[i - 1] + alpha_l_iter[i]) * v_l_iter[i] * (rho_l_old[i - 1] + rho_l_old[i]) / (4 * dt)
+                                        + (rho_l_iter[i - 1] + rho_l_iter[i]) * v_l_iter[i] * (alpha_l_old[i - 1] + alpha_l_old[i]) / (4 * dt));
+
+                    acc_mom_l += (arho_new_ml - arho_old_ml) * (M_PI * r_v * r_v * dz);
 
                     acc_energy_w += q_pp[i] * (2 * M_PI * r_o * dz) + power_flux_xw[i] * M_PI * (r_o * r_o - r_i * r_i);
 
@@ -2240,11 +2266,12 @@ int main() {
 
                     // Check total momentum sources vapor
 
-                    bal_mom_m += (p_m[i] - p_m[i - 1]) * (alpha_m_iter[i - 1] + alpha_m_iter[i]) / (2 * dz) * (M_PI * r_v * r_v * dz);
+                    bal_mom_m += -(p_m[i] - p_m[i - 1]) * (alpha_m_iter[i - 1] + alpha_m_iter[i]) / (2 * dz) * (M_PI * r_v * r_v * dz);
 
                     // Check total momentum sources liquid
 
-                    bal_mom_l += (p_l[i] - p_l[i - 1]) * (alpha_l_iter[i - 1] + alpha_l_iter[i]) / (2 * dz) * (M_PI * r_v * r_v * dz);
+                    bal_mom_l += -eps_v * (p_l[i] - p_l[i - 1]) * (alpha_l_iter[i - 1] + alpha_l_iter[i]) / (2 * dz) * (M_PI * r_v * r_v * dz)
+                                 - (alpha_l[i] - alpha_l[i - 1]) * (DPcap[i - 1] + DPcap[i]) / (2 * dz) * (M_PI * r_v * r_v * dz);
 
                     // Check total heat wall sources
 
@@ -2252,21 +2279,21 @@ int main() {
                 
                     // Check total external heat sources
 
-                    global_energy_balance += q_pp[i] * (2 * M_PI * r_o * dz);                    
+                    global_energy_balance += q_pp[i] * (2 * M_PI * r_o * dz);       
                 }
 
                 // --------- Differences
 
-                diff_mass_m += (acc_mass_m - bal_mass_m);
-                diff_mass_l += (acc_mass_l - bal_mass_l);
+                diff_mass_m = (acc_mass_m - bal_mass_m);
+                diff_mass_l = (acc_mass_l - bal_mass_l);
 
-                diff_energy_m += (acc_energy_m - bal_energy_m);
-                diff_energy_l += (acc_energy_l - bal_energy_l);
+                diff_energy_m = (acc_energy_m - bal_energy_m);
+                diff_energy_l = (acc_energy_l - bal_energy_l);
 
-                diff_mom_m += (acc_mom_m - bal_mom_m);
-                diff_mom_l += (acc_mom_l - bal_mom_l);
+                diff_mom_m = (acc_mom_m - bal_mom_m);
+                diff_mom_l = (acc_mom_l - bal_mom_l);
 
-                diff_energy_w += (acc_energy_w - bal_energy_w);
+                diff_energy_w = (acc_energy_w - bal_energy_w);
 
                 time_output << time_total << " ";
                 dt_output << dt << " ";
