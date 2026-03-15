@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from matplotlib.widgets import Button, Slider
+from matplotlib.widgets import Button, Slider, TextBox
 from io import StringIO
 import textwrap
 
@@ -17,51 +17,67 @@ def safe_loadtxt(filename, fill_value=-1e9):
     return np.loadtxt(StringIO(''.join(lines)))
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-os.chdir(script_dir)
 root = script_dir
 
-cases = [d for d in os.listdir(root) if os.path.isdir(d) and "case" in d]
+cases = []
 
-if len(cases) == 0:
+# case_* nella cartella corrente
+for d in os.listdir(root):
+    full = os.path.join(root, d)
+    if os.path.isdir(full) and d.startswith("case_"):
+        cases.append(full)
+
+# case_* dentro sottocartelle cases_*
+for d in os.listdir(root):
+    parent = os.path.join(root, d)
+    if os.path.isdir(parent) and d.startswith("cases_"):
+        for sub in os.listdir(parent):
+            full = os.path.join(parent, sub)
+            if os.path.isdir(full) and sub.startswith("case_"):
+                cases.append(full)
+
+cases = sorted(cases)
+
+if not cases:
     print("No case folders found")
     sys.exit(1)
 
 print("Available cases:")
 for i, c in enumerate(cases):
-    print(i, c)
+    print(f"{i}: {os.path.relpath(c, root)}")
 
 idx = int(input("Select case index: "))
 case = cases[idx]
 
+
+# -------------------- Files --------------------
 x_file = os.path.join(case, "mesh.txt")
 time_file = os.path.join(case, "time.txt")
 
-
 targets = [
-    "vapor_temperature.txt",
     "vapor_velocity.txt",
     "vapor_pressure.txt",
-    "vapor_alpha.txt",
-    "liquid_temperature.txt",
+    "vapor_temperature.txt",
+    "rho_vapor.txt",
     "liquid_velocity.txt",
     "liquid_pressure.txt",
-    "liquid_alpha.txt",
-    "rho_vapor.txt",
+    "liquid_temperature.txt",
     "liquid_rho.txt",
     "wall_temperature.txt",
-
+    "vapor_alpha.txt",
+    "liquid_alpha.txt",
     "gamma_xv.txt",
-    "phi_xv.txt",
-    "heat_source_wall_liquid_flux.txt",
-    "heat_source_liquid_wall_flux.txt",
-    "heat_source_vapor_liquid_phase.txt",
-    "heat_source_liquid_vapor_phase.txt",
-    "heat_source_vapor_liquid_flux.txt",
-    "heat_source_liquid_vapor_flux.txt",
+    "power_flux_wx.txt",
+    "power_flux_xw.txt",
+    "power_mass_vx.txt",
+    "power_mass_xv.txt",
+    "power_flux_vx.txt",
+    "power_flux_xv.txt",
     "p_saturation.txt",
     "T_sur.txt",
+    "delta_p_capillary.txt",
+    "power_flux_ow.txt"
 ]
-
 
 y_files = [os.path.join(case, p) for p in targets]
 
@@ -70,68 +86,77 @@ for f in [x_file, time_file] + y_files:
         print("Missing file:", f)
         sys.exit(1)
 
+# -------------------- Load data --------------------
 x = safe_loadtxt(x_file)
 time = safe_loadtxt(time_file)
+nT = len(time)
+
 Y = [safe_loadtxt(f) for f in y_files]
 
+
+Y_clean = []
+for arr in Y:
+    if arr.shape[0] > nT:
+        arr = arr[:nT, :]          # taglia righe in eccesso
+    elif arr.shape[0] < nT:
+        pad = np.full((nT - arr.shape[0], arr.shape[1]), np.nan)
+        arr = np.vstack([arr, pad])  # padding se troppo corto
+    Y_clean.append(arr)
+
+Y = Y_clean
+
+
 names = [
-    "Vapor temperature",
     "Vapor velocity",
     "Vapor pressure",
-    "Vapor volume fraction",
-    "Liquid temperature",
+    "Vapor temperature",
+    "Vapor density",
     "Liquid velocity",
     "Liquid pressure",
-    "Liquid volume fraction",
-    "Vapor density",
+    "Liquid temperature",
     "Liquid density",
     "Wall temperature",
-
-    "Gamma_xv",
-    "Phi_xv",
-    "Heat source wall→liquid (flux)",
-    "Heat source liquid→wall (flux)",
-    "Heat source vapor→liquid (phase)",
-    "Heat source liquid→vapor (phase)",
-    "Heat source vapor→liquid (flux)",
-    "Heat source liquid→vapor (flux)",
+    "Vapor volume fraction",
+    "Liquid volume fraction",
+    "Mass transfer rate",
+    "Power from wall to liquid",
+    "Power from liquid to wall",
+    "Power from vapor to liquid due to phase change",
+    "Power from liquid to vapor due to phase change",
+    "Power from vapor to liquid",
+    "Power from liquid to vapor",
     "Saturation pressure",
-    "T_sur"
+    "Interface temperature (T_sur)",
+    "Capillary pressure drop",
+    "External power"
 ]
-
 
 units = [
+    "[m/s]", "[Pa]", "[K]", "[kg/m³]",
+    "[m/s]", "[Pa]", "[K]", "[kg/m³]",
     "[K]",
-    "[m/s]",
-    "[Pa]",
-    "[-]",
-    "[K]",
-    "[m/s]",
-    "[Pa]",
-    "[-]",
-    "[kg/m³]",
-    "[kg/m³]",
-    "[K]",
-
-    "[kg/(m³·s)]",         # Gamma_xv
-    "[kg/(m²·s)]",         # Phi_xv
-    "[W/m³]",              # heat wall→liquid
-    "[W/m³]",              # heat liquid→wall
-    "[W/m³]",              # heat vapor→liquid (phase)
-    "[W/m³]",              # heat liquid→vapor (phase)
-    "[W/m³]",              # heat vapor→liquid (flux)
-    "[W/m³]",              # heat liquid→vapor (flux)
-    "[Pa]",                # psat
-    "[K]"                  # T_sur
+    "[-]", "[-]",
+    "[kg/s]",
+    "[W]", "[W]",
+    "[W]", "[W]",
+    "[W]", "[W]",
+    "[Pa]", "[K]",
+    "[Pa]", "[W]"
 ]
 
-
-
+# -------------------- Utils --------------------
 def robust_ylim(y):
     vals = y.flatten() if y.ndim > 1 else y
     lo, hi = np.percentile(vals, [1, 99])
+
     if lo == hi:
-        lo, hi = np.min(vals), np.max(vals)
+        if lo == 0.0:
+            eps = 1e-12
+        else:
+            eps = abs(lo) * 1e-6
+        lo -= eps
+        hi += eps
+
     margin = 0.1 * (hi - lo)
     return lo - margin, hi + margin
 
@@ -141,42 +166,61 @@ def pos_to_index(val):
 def index_to_pos(i):
     return x[i]
 
+# -------------------- Figure --------------------
 fig, ax = plt.subplots(figsize=(11, 6))
-plt.subplots_adjust(left=0.08, bottom=0.25, right=0.58)
+plt.subplots_adjust(left=0.08, bottom=0.25, right=0.60)
 line, = ax.plot([], [], lw=2)
+line2, = ax.plot([], [], lw=1, linestyle='--')
 ax.grid(True)
 ax.set_xlabel("Time [s]")
 
-ax_slider = plt.axes([0.15, 0.1, 0.55, 0.03])
+# Slider posizione assiale
+ax_slider = plt.axes([0.13, 0.10, 0.42, 0.03])
 slider = Slider(ax_slider, "Axial pos [m]", x.min(), x.max(), valinit=x[0])
 
+ax_xbox = plt.axes([0.70, 0.10, 0.08, 0.04])
+x_box = TextBox(ax_xbox, "Set x [m] ", initial=f"{x[0]:.6g}")
+
+# -------------------- Buttons (layout come versione buona) --------------------
 buttons = []
-n_vars = len(Y)
-n_cols = 3
-button_width = 0.10
-button_height = 0.08
-col_gap = 0.02
-row_gap = 0.10
-start_x = 0.62
-start_y = 0.86
+n_vars = len(names)
+n_cols = 3                # numero colonne
+button_width = 0.11
+button_height = 0.07
+col_gap = 0.005           # pulsanti più vicini orizzontalmente
+
+panel_left = 0.62
+panel_top = 0.95
+panel_bottom = 0.05
+
+# calcolo righe totali necessarie
+n_rows = int(np.ceil(n_vars / n_cols))
+
+# altezza effettiva per ogni riga
+row_height = (panel_top - panel_bottom) / (n_rows + 2.0)
 
 for i, name in enumerate(names):
     col = i % n_cols
     row = i // n_cols
-    label = "\n".join(textwrap.wrap(name, 15))
-    x_pos = start_x + col * (button_width + col_gap)
-    y_pos = start_y - row * row_gap
+
+    x_pos = panel_left + col * (button_width + col_gap)
+    # riga 0 in alto
+    y_pos = panel_top - (row + 1) * row_height
+
     b_ax = plt.axes([x_pos, y_pos, button_width, button_height])
-    btn = Button(b_ax, label, hovercolor='0.975')
-    btn.label.set_fontsize(8)
+    btn = Button(b_ax, "\n".join(textwrap.wrap(name, 15)), hovercolor='0.975')
+    btn.label.set_fontsize(9)
     buttons.append(btn)
 
+# -------------------- Control buttons --------------------
 ax_play = plt.axes([0.15, 0.02, 0.10, 0.05])
 btn_play = Button(ax_play, "Play", hovercolor='0.975')
 ax_pause = plt.axes([0.27, 0.02, 0.10, 0.05])
 btn_pause = Button(ax_pause, "Pause", hovercolor='0.975')
 ax_reset = plt.axes([0.39, 0.02, 0.10, 0.05])
 btn_reset = Button(ax_reset, "Reset", hovercolor='0.975')
+ax_save = plt.axes([0.51, 0.02, 0.10, 0.05])
+btn_save = Button(ax_save, "Save")
 
 current_idx = 0
 ydata = Y[current_idx]
@@ -190,14 +234,29 @@ ax.set_xlim(time.min(), time.max())
 paused = [False]
 current_node = [0]
 
+# -------------------- Drawing --------------------
 def draw_node(i, update_slider=True):
     y = Y[current_idx]
+
+    # curva principale: y(t, x_i)
     line.set_data(time, y[:, i])
+
+    if names[current_idx] == "Vapor velocity":
+        y_sonic = Y[names.index("Sonic speed")]
+        line2.set_data(time, y_sonic[:, i])
+        line2.set_visible(True)
+    else:
+        # dati coerenti per evitare errori nel draw
+        line2.set_data(time, np.full_like(time, np.nan))
+        line2.set_visible(False)
+
     ax.set_ylim(*robust_ylim(y[:, i]))
+
     if update_slider:
         slider.disconnect(slider_cid)
         slider.set_val(index_to_pos(i))
         connect_slider()
+
     return line,
 
 def update_auto(i):
@@ -212,12 +271,30 @@ def slider_update(val):
     draw_node(i, update_slider=False)
     fig.canvas.draw_idle()
 
+def submit_x(text):
+    try:
+        xv = float(text)
+    except ValueError:
+        return
+
+    # clamp nel dominio
+    xv = max(x.min(), min(xv, x.max()))
+
+    i = pos_to_index(xv)
+    current_node[0] = i
+
+    draw_node(i, update_slider=False)
+    slider.set_val(index_to_pos(i))
+    fig.canvas.draw_idle()
+
 def connect_slider():
     global slider_cid
     slider_cid = slider.on_changed(slider_update)
 
 connect_slider()
+x_box.on_submit(submit_x)
 
+# -------------------- Variable change --------------------
 def change_variable(idx):
     global current_idx, ydata
     current_idx = idx
@@ -228,6 +305,7 @@ def change_variable(idx):
 for i, btn in enumerate(buttons):
     btn.on_clicked(lambda event, j=i: change_variable(j))
 
+# -------------------- Controls --------------------
 def pause(event):
     paused[0] = True
 
@@ -237,20 +315,54 @@ def reset(event):
     draw_node(0)
     slider.set_val(x[0])
     fig.canvas.draw_idle()
+    x_box.set_val(f"{x[0]:.6g}")
+
+def reset(event):
+    paused[0] = True
+    current_node[0] = 0
+    draw_node(0)
+    slider.set_val(x[0])
+    x_box.set_val(f"{x[0]:.6g}")
+    fig.canvas.draw_idle()
 
 def play(event):
     paused[0] = False
 
+def save_plot(event):
+    fig.canvas.draw()
+
+    # bounding box dell'axes
+    bbox = ax.get_tightbbox(fig.canvas.get_renderer())
+    bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
+
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
+    filename = os.path.join(
+        desktop,
+        f"{names[current_idx].replace(' ', '_')}.png"
+    )
+
+    fig.savefig(
+        filename,
+        dpi=300,
+        bbox_inches=bbox_inches,
+        pad_inches=0.02
+    )
+
+    print(f"Saved on Desktop: {filename}")
+
 btn_play.on_clicked(play)
 btn_pause.on_clicked(pause)
 btn_reset.on_clicked(reset)
+btn_save.on_clicked(save_plot)
 
+# -------------------- Animation --------------------
 skip = max(1, n_nodes // 200)
 ani = FuncAnimation(
     fig,
     update_auto,
     frames=range(0, n_nodes, skip),
-    interval=10000 / (n_nodes/skip),
+    interval=10000 / (n_nodes / skip),
     blit=False,
     repeat=True
 )
