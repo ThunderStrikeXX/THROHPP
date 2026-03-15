@@ -32,39 +32,39 @@ int main() {
     const double M_PI = 3.14159265358979323846;
 
     // Physical properties
-    const double emissivity = 0.9;          /// Wall emissivity [-]
-    const double sigma = 5.67e-8;           /// Stefan-Boltzmann constant [W/m^2/K^4]
-    const double Rv = 361.8;                /// Gas constant for the sodium vapor [J/(kg K)]
-    const double Tc = 2509.46;              /// Critical temperature of sodium [K]
-    double const eps_v = 1.0;               /// Surface fraction of the wick available for liquid passage [-]
+    const double emissivity = 0.9;          // Wall emissivity [-]
+    const double sigma = 5.67e-8;           // Stefan-Boltzmann constant [W/m^2/K^4]
+    const double Rv = 361.8;                // Gas constant for the sodium vapor [J/(kg K)]
+    const double Tc = 2509.46;              // Critical temperature of sodium [K]
+    double const eps_v = 1.0;               // Surface fraction of the wick available for liquid passage [-]
 
     // Wick permeability parameters
-    const double K = 1e-10;                 /// Permeability [m^2]
-    const double CF = 1e5;                  /// Forchheimer coefficient [1/m]
+    const double K = 1e-10;                 // Permeability [m^2]
+    const double CF = 1e5;                  // Forchheimer coefficient [1/m]
 
     // Evaporation and condensation parameters
-    const double eps_s = 0.01;               /// Surface fraction of the wick available for phasic interface [-]
-    const double sigma_e = 0.05;            /// Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.05;            /// Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const double eps_s = 0.01;               // Surface fraction of the wick available for phasic interface [-]
+    const double sigma_e = 0.05;            // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 0.05;            // Condensation accomodation coefficient [-]. 1 means optimal condensation
 
     // Geometric parameters
-    const int N = 16;                                                           /// Number of axial nodes [-]
-    const double l = 0.982; 			                                        /// Length of the heat pipe [m]
-    const double dz = l / (N - 2);                                                    /// Axial discretization step [m]
-    const double evaporator_length = 0.502;                                     /// Evaporator length [m]
-    const double adiabatic_length = 0.188;                                      /// Adiabatic length [m]
-    const double condenser_length = 0.292;                                      /// Condenser length [m]
-    const double evaporator_nodes = std::floor(evaporator_length / dz);         /// Number of evaporator nodes
-    const double condenser_nodes = std::ceil(condenser_length / dz);            /// Number of condenser nodes
-    const double adiabatic_nodes = N - (evaporator_nodes + condenser_nodes);    /// Number of adiabatic nodes
-    const double r_o = 0.01335;                                                 /// Outer wall radius [m]
-    const double r_i = 0.0112;                                                  /// Wall-wick interface radius [m]
-    const double r_v = 0.01075;                                                 /// Vapor-wick interface radius [m]
-    const double V_wall = dz * M_PI * (r_o * r_o - r_i * r_i);                  /// Volume of the wall cell [m3]
-    const double V_liquid = dz * M_PI * (r_i * r_i - r_v * r_v);                /// Volume of the liquid cell [m3]
-    const double V_vapor = dz * M_PI * r_v * r_v;                               /// Volume of the vapor cell [m3]
-    const double lateral_surface = dz * 2 * M_PI * r_o;                         /// Lateral outer surface [m2]
-    const double Dh_v = 2.0 * r_v;                                              /// Hydraulic diameter of the vapor core [m]
+    const int N = 16;                                                           // Number of axial nodes [-]
+    const double l = 0.982; 			                                        // Length of the heat pipe [m]
+    const double dz = l / (N - 2);                                                    // Axial discretization step [m]
+    const double evaporator_length = 0.502;                                     // Evaporator length [m]
+    const double adiabatic_length = 0.188;                                      // Adiabatic length [m]
+    const double condenser_length = 0.292;                                      // Condenser length [m]
+    const double evaporator_nodes = std::floor(evaporator_length / dz);         // Number of evaporator nodes
+    const double condenser_nodes = std::ceil(condenser_length / dz);            // Number of condenser nodes
+    const double adiabatic_nodes = N - (evaporator_nodes + condenser_nodes);    // Number of adiabatic nodes
+    const double r_o = 0.01335;                                                 // Outer wall radius [m]
+    const double r_i = 0.0112;                                                  // Wall-wick interface radius [m]
+    const double r_v = 0.01075;                                                 // Vapor-wick interface radius [m]
+    const double V_wall = dz * M_PI * (r_o * r_o - r_i * r_i);                  // Volume of the wall cell [m3]
+    const double V_liquid = dz * M_PI * (r_i * r_i - r_v * r_v);                // Volume of the liquid cell [m3]
+    const double V_vapor = dz * M_PI * r_v * r_v;                               // Volume of the vapor cell [m3]
+    const double lateral_surface = dz * 2 * M_PI * r_o;                         // Lateral outer surface [m2]
+    const double Dh_v = 2.0 * r_v;                                              // Hydraulic diameter of the vapor core [m]
     double Omega = 1.0;
     const double Kgeom = 2.0 * r_v * eps_s / (r_i * r_i);
 
@@ -75,33 +75,33 @@ int main() {
     const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Environmental boundary conditions
-    const double h_conv = 1;                                                       /// Convective heat transfer coefficient for external heat removal [W/m^2/K]
-    const double power = 1000;                                                      /// Power at the evaporator side [W]
-    const double T_env = 280.0;                                                     /// External environmental temperature [K]
-    const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
+    const double h_conv = 1;                                                       // Convective heat transfer coefficient for external heat removal [W/m^2/K]
+    const double power = 1000;                                                      // Power at the evaporator side [W]
+    const double T_env = 280.0;                                                     // External environmental temperature [K]
+    const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    // Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-5;                              /// Initial time step [s] (then it is updated according to the limits)
-    double dt = dt_user;                                /// Actual used time step [s]
+    double dt_user = 1e-5;                              // Initial time step [s] (then it is updated according to the limits)
+    double dt = dt_user;                                // Actual used time step [s]
     double time_simulation = 5000;                      // 
-    double time_total = 0.0;                            /// Total time elapsed [s]
+    double time_total = 0.0;                            // Total time elapsed [s]
     double t_last_print = 0.0;
     double print_interval = 1e-9;
-    int halves = 0;                                     /// Number of times the time step has been halved [-]
+    int halves = 0;                                     // Number of times the time step has been halved [-]
 
     // Picard loops parameters	          
-    int pic = 0;                                        /// Number of Picard iterations [-]
-    const int max_picard = 50;                         /// Maximum number of Picard iterations per timestep [-]
-    std::array<double, B> L_pic;                        /// Picard residuals [-]
-    std::array<bool, B> conv_var;                       /// Bool array if parameter converged or not [-]
-    std::array<double, B> pic_tol = {                   /// Tolerance for the convergence of Picard loop [-]
+    int pic = 0;                                        // Number of Picard iterations [-]
+    const int max_picard = 20;                         // Maximum number of Picard iterations per timestep [-]
+    std::array<double, B> L_pic;                        // Picard residuals [-]
+    std::array<bool, B> conv_var;                       // Bool array if parameter converged or not [-]
+    std::array<double, B> pic_tol = {                   // Tolerance for the convergence of Picard loop [-]
         1e-6,  // rho_m
         1e-6,  // rho_l
         1e-3,  // alpha_m
         1e-3,  // alpha_l
         1e-2,  // p_m
         1e-2,  // p_l
-        1e-4,  // v_m
+        1e-2,  // v_m
         1e-4,  // v_l
         1e-3,  // T_m
         1e-3,  // T_l
@@ -110,63 +110,53 @@ int main() {
 
     // Mesh z positions
     std::vector<double> mesh(N - 2, 0.0);
-    for (int i = 0; i < N - 2; ++i) mesh[i] = i * dz;     /// Mesh discretization
+    for (int i = 0; i < N - 2; ++i) mesh[i] = i * dz;     // Mesh discretization
 
     // State variables definition and initialization
-    std::vector<double> rho_m(N, 0.01);                 /// Mixture density [kg/m3]
-    std::vector<double> rho_l(N, 1000);                 /// Liquid density [kg/m3]
-    std::vector<double> p_m(N);                         /// Mixture pressure [Pa]
-    std::vector<double> p_l(N);                         /// Liquid pressure [Pa]
-    std::vector<double> v_m(N + 1, 1.0);                  /// Mixture velocity [m/s]
-    std::vector<double> v_l(N + 1, -0.1);                  /// Liquid velocity [m/s]
-    std::vector<double> T_m(N);                         /// Mixture bulk temperature [K]
-    std::vector<double> T_l(N);                         /// Liquid bulk temperature [K]
-    std::vector<double> T_w(N);                         /// Wall bulk temperature [K]
-
-    std::vector<double> alpha_m(N), alpha_l(N);
-
-    for (int i = 0; i < N; ++i) {
-        double s = static_cast<double>(i) / (N - 1);
-
-        alpha_m[i] = 0.9;
-        alpha_l[i] = 0.1;
-
-        // alpha_m[i] = 0.95 - 0.35 * s;   // 0.95 → 0.60
-        // alpha_l[i] = 1.0 - alpha_m[i];  // 0.05 → 0.40
-    }
+    std::vector<double> rho_m(N);                   // Mixture density [kg/m3]
+    std::vector<double> rho_l(N);                   // Liquid density [kg/m3]
+    std::vector<double> p_m(N);                     // Mixture pressure [Pa]
+    std::vector<double> p_l(N);                     // Liquid pressure [Pa]
+    std::vector<double> v_m(N + 1);                 // Mixture velocity [m/s]
+    std::vector<double> v_l(N + 1);                 // Liquid velocity [m/s]
+    std::vector<double> T_m(N);                     // Mixture bulk temperature [K]
+    std::vector<double> T_l(N);                     // Liquid bulk temperature [K]
+    std::vector<double> T_w(N);                     // Wall bulk temperature [K]
+    std::vector<double> alpha_m(N);                 // Mixture volume fraction [-]
+    std::vector<double> alpha_l(N);                 // Liquid volume fraction [-]
 
     // Secondary useful variables
-    std::vector<double> Gamma_xv(N, 0.0);                           /// Exact mass volumetric source [kg/m3s]
-    std::vector<double> Gamma_xv_lin(N, 0.0);                       /// Linearized mass volumetric source (with C coefficients) [kg/m3s]
-    std::vector<double> Gamma_xv_approx_error(N, 0.0);                      /// Residual between approximation and exact mass volumetric source 1 [kg/m3s]
-    std::vector<double> Gamma_xv_lin_error(N, 0.0);                     /// Residual between approximation and exact mass volumetric source 2 [kg/m3s]
+    std::vector<double> Gamma_xv(N, 0.0);                   // Exact mass volumetric source [kg/m3s]
+    std::vector<double> Gamma_xv_lin(N, 0.0);               // Linearized mass volumetric source (with C coefficients) [kg/m3s]
+    std::vector<double> Gamma_xv_approx_error(N, 0.0);      // Residual between approximation and exact mass volumetric source 1 [kg/m3s]
+    std::vector<double> Gamma_xv_lin_error(N, 0.0);         // Residual between approximation and exact mass volumetric source 2 [kg/m3s]
     std::vector<double> Gamma_xv_diff_error(N, 0.0);
-    std::vector<double> Gamma_xv_approx(N, 0.0);                    /// Approximated mass volumetric source (with gamma coefficients) [kg/m3s]
-    std::vector<double> T_sur(N);                                   /// Wick-vapor surface temperature [K]
-    std::vector<double> q_pp(N, 0.0);                               /// Heat flux profile [W/m^2]
-    std::vector<double> phi_x_v(N, 0.0);                            /// Mass flux [kg/m2s]
-    std::vector<double> power_flux_wx(N, 0.0);       /// Heat volumetric source from wall to liquid due to difference in temperature [W/m3]
-    std::vector<double> power_flux_xw(N, 0.0);       /// Heat volumetric source from liquid to wall due to difference in temperature [W/m3]
-    std::vector<double> power_mass_vx(N, 0.0);     /// Heat volumetric source from vapor to liquid due to phase change [W/m3]
-    std::vector<double> power_mass_xv(N, 0.0);     /// Heat volumetric source from liquid to vapor due to phase change [W/m3]
-    std::vector<double> power_flux_vx(N, 0.0);      /// Heat volumetric source from vapor to liquid due to difference in temperature [W/m3]
-    std::vector<double> power_flux_xv(N, 0.0);      /// Heat volumetric source from liquid to vapor due to difference in temperature [W/m3]
-    std::vector<double> p_saturation(N);                            /// Saturation pressure at the temperature of the wick-vapor surface [Pa]
-    std::vector<double> DPcap(N, 0.0);                              /// Capillary pressure difference between mixture and vapor [Pa]
-    std::vector<double> energy_wall(N, 0.0);                        /// Wall internal energy [J]
-    std::vector<double> energy_liquid(N, 0.0);                      /// Liquid internal energy [J]
-    std::vector<double> energy_vapor(N, 0.0);                       /// Mixture internal energy [J]
-    std::vector<double> aGamma(N);                                  /// a coefficient for the mass volumetric source approximation [?]
-    std::vector<double> bGamma(N);                                  /// b coefficient for the mass volumetric source approximation [?]
-    std::vector<double> cGamma(N);                                  /// c coefficient for the mass volumetric source approximation [?]
+    std::vector<double> Gamma_xv_approx(N, 0.0);            // Approximated mass volumetric source (with gamma coefficients) [kg/m3s]
+    std::vector<double> T_sur(N);                           // Wick-vapor surface temperature [K]
+    std::vector<double> q_pp(N, 0.0);                       // Heat flux profile [W/m^2]
+    std::vector<double> power_flux_wx(N, 0.0);              // Heat volumetric source from wall to liquid due to difference in temperature [W/m3]
+    std::vector<double> power_flux_xw(N, 0.0);              // Heat volumetric source from liquid to wall due to difference in temperature [W/m3]
+    std::vector<double> power_mass_vx(N, 0.0);              // Heat volumetric source from vapor to liquid due to phase change [W/m3]
+    std::vector<double> power_mass_xv(N, 0.0);              // Heat volumetric source from liquid to vapor due to phase change [W/m3]
+    std::vector<double> power_flux_vx(N, 0.0);              // Heat volumetric source from vapor to liquid due to difference in temperature [W/m3]
+    std::vector<double> power_flux_xv(N, 0.0);              // Heat volumetric source from liquid to vapor due to difference in temperature [W/m3]
+    std::vector<double> p_saturation(N);                    // Saturation pressure at the temperature of the wick-vapor surface [Pa]
+    std::vector<double> dPsat_dT(N);
+    std::vector<double> DPcap(N, 0.0);                      // Capillary pressure difference between mixture and vapor [Pa]
+    std::vector<double> energy_wall(N, 0.0);                // Wall internal energy [J]
+    std::vector<double> energy_liquid(N, 0.0);              // Liquid internal energy [J]
+    std::vector<double> energy_vapor(N, 0.0);               // Mixture internal energy [J]
+    std::vector<double> aGamma(N);                          // a coefficient for the mass volumetric source approximation [?]
+    std::vector<double> bGamma(N);                          // b coefficient for the mass volumetric source approximation [?]
+    std::vector<double> cGamma(N);                          // c coefficient for the mass volumetric source approximation [?]
 
-    double h_xv_v;                                                  /// Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
-    double h_vx_x;                                                  /// Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
+    double h_xv_v;                                          // Specific enthalpy [J/kg] of vapor upon phase change between wick and vapor
+    double h_vx_x;                                          // Specific enthalpy [J/kg] of wick upon phase change between vapor and wick
 
     const double T_left = 1100.0;                        /// First node initialization temperature [K]
     const double T_right = 900.0;                       /// Last node initialization temperature [K]
 
-    // Temperatures initialization
+    // Variables initialization
     for (int i = 0; i < N; ++i) {
 
         const double s = static_cast<double>(i) / (N - 1);
@@ -183,17 +173,18 @@ int main() {
         rho_m[i] = p_m[i] / (T_m[i] * Rv);
         rho_l[i] = 219 + 275.32 * (1 - T_l[i] / Tc) + 511.58 * std::pow((1 - T_l[i] / Tc), 0.5);
 
+        // alpha_m[i] = 0.95 - 0.35 * s;   // 0.95 → 0.60
+        // alpha_l[i] = 1.0 - alpha_m[i];  // 0.05 → 0.40
+
+        alpha_m[i] = 0.90;
+        alpha_l[i] = 0.10;
     }
 
-    v_l[0] = 0.0;
-    v_l[1] = 0.0;
-    v_l[N - 1] = 0.0;
-    v_l[N] = 0.0;
+    for (int i = 2; i < N - 1; i++) {
 
-    v_m[0] = 0.0;
-    v_m[1] = 0.0;
-    v_m[N - 1] = 0.0;
-    v_m[N] = 0.0;
+        v_m[i] = 1.0;
+        v_l[i] = -0.1;
+    }
 
     // Old variables
     std::vector<double> rho_m_old = rho_m;
@@ -208,7 +199,7 @@ int main() {
     std::vector<double> T_l_old = T_l;
     std::vector<double> T_w_old = T_w;
 
-    /// Iter variables
+    // Iter variables
     std::vector<double> rho_m_iter = rho_m;
     std::vector<double> rho_l_iter = rho_l;
     std::vector<double> alpha_m_iter = alpha_m;
@@ -222,10 +213,116 @@ int main() {
     std::vector<double> T_w_iter = T_w;
 
     std::vector<double> T_sur_iter = T_sur;
+    std::vector<double> Gamma_xv_iter = Gamma_xv;
+
+    std::vector<double> T_sur_old = T_sur;
+    std::vector<double> Gamma_xv_old = Gamma_xv;
 
     // Blocks definition
     std::vector<SparseBlock> L(N), D(N), R(N);
     std::vector<VecBlock> Q(N), X(N);
+
+    // Vapor Equation of State update function. Updates density
+    auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
+
+        for (int i = 0; i < N; i++) { rho_[i] = std::max(1e-6, p_[i] / (Rv * T_[i])); }
+
+        }; eos_update(rho_m, p_m, T_m);
+
+    // Differences between the heat exchanged at interfaces due to linearization (should be zero to machine precision)
+    std::vector<double> power_residual_xw(N, 0);
+    std::vector<double> heat_residual_xv(N, 0);
+
+    // Heat exchange balance liquid vapor
+    std::vector<double> heat_conduction_flux(N, 0.0);
+    std::vector<double> heat_convection_flux(N, 0.0);
+    std::vector<double> heat_phase_flux(N, 0.0);
+
+    std::vector<double> C1(N, 0.0), C2(N, 0.0), C3(N, 0.0), C4(N, 0.0), C5(N, 0.0), C6(N, 0.0), C7(N, 0.0), C8(N, 0.0), C9(N, 0.0), C10(N, 0.0), C11(N, 0.0), C12(N, 0.0)
+        , C13(N, 0.0), C14(N, 0.0), C15(N, 0.0), C16(N, 0.0), C17(N, 0.0), C18(N, 0.0), C19(N, 0.0), C20(N, 0.0), C21(N, 0.0), C22(N, 0.0), C23(N, 0.0), C24(N, 0.0), C25(N, 0.0)
+        , C26(N, 0.0), C27(N, 0.0), C28(N, 0.0), C29(N, 0.0), C30(N, 0.0), C31(N, 0.0), C32(N, 0.0), C33(N, 0.0), C34(N, 0.0), C35(N, 0.0), C36(N, 0.0), C37(N, 0.0), C38(N, 0.0)
+        , C39(N, 0.0), C40(N, 0.0), C41(N, 0.0), C42(N, 0.0), C43(N, 0.0), C44(N, 0.0), C45(N, 0.0), C46(N, 0.0), C47(N, 0.0), C48(N, 0.0), C49(N, 0.0), C50(N, 0.0), C51(N, 0.0)
+        , C52(N, 0.0), C53(N, 0.0), C54(N, 0.0), C55(N, 0.0), C56(N, 0.0), C57(N, 0.0), C58(N, 0.0), C59(N, 0.0), C60(N, 0.0), C61(N, 0.0), C62(N, 0.0), C63(N, 0.0), C64(N, 0.0)
+        , C65(N, 0.0), C66(N, 0.0), C67(N, 0.0), C68(N, 0.0), C69(N, 0.0), C70(N, 0.0), C71(N, 0.0), C72(N, 0.0), C73(N, 0.0), C74(N, 0.0), C75(N, 0.0);
+
+    std::vector<double> H_xm(N, 0.0);
+    std::vector<double> Dh(N, 0.0);
+
+    std::vector<double> heat_balance_xv_1(N, 0.0);
+    std::vector<double> heat_balance_xv_2(N, 0.0);
+    std::vector<double> heat_balance_xv_3(N, 0.0);
+    std::vector<double> heat_balance_xv_4(N, 0.0);
+    std::vector<double> heat_balance_xv_5(N, 0.0);
+
+    std::vector<double> a_x(N, 0.0);
+    std::vector<double> b_x(N, 0.0);
+    std::vector<double> c_x(N, 0.0);
+    std::vector<double> a_w(N, 0.0);
+    std::vector<double> b_w(N, 0.0);
+    std::vector<double> c_w(N, 0.0);
+
+    std::vector<double> T_sur_lin(N, 0.0);
+    std::vector<double> T_sur_diff(N, 0.0);
+
+    std::vector<double> balance_condition(N, 0.0);
+
+    std::vector<double> alpha1(N, 0.0);
+    std::vector<double> alpha2(N, 0.0);
+    std::vector<double> alpha3(N, 0.0);
+    std::vector<double> alpha4(N, 0.0);
+    std::vector<double> alpha5(N, 0.0);
+    std::vector<double> alpha6(N, 0.0);
+    std::vector<double> alpha7(N, 0.0);
+    std::vector<double> alpha8(N, 0.0);
+    std::vector<double> alpha9(N, 0.0);
+    std::vector<double> alpha10(N, 0.0);
+    std::vector<double> alpha11(N, 0.0);
+    std::vector<double> alpha12(N, 0.0);
+    std::vector<double> delta(N, 0.0);
+
+    std::vector<double> residual1(N, 0.0);
+    std::vector<double> residual2(N, 0.0);
+    std::vector<double> residual3(N, 0.0);
+    std::vector<double> residual4(N, 0.0);
+    std::vector<double> residual5(N, 0.0);
+    std::vector<double> residual6(N, 0.0);
+
+    std::vector<double> Ex3(N, 0.0);
+    std::vector<double> Ex4(N, 0.0);
+    std::vector<double> Ex5(N, 0.0);
+    std::vector<double> Ex6(N, 0.0);
+    std::vector<double> Ex7(N, 0.0);
+    std::vector<double> Ex8(N, 0.0);
+
+    std::vector<double> power_residual_xv(N, 0.0);
+
+    // ------ Properties
+
+    std::vector<double> cp_m(N, vapor_sodium::cp_g_linear());
+    std::vector<double> cp_m_old = cp_m;
+
+    std::vector<double> cp_l(N, liquid_sodium::cp_l_linear());
+    std::vector<double> cp_l_old = cp_l;
+
+    std::vector<double> cp_w(N);
+    std::vector<double> cp_w_old = cp_w;
+
+    std::vector<double> k_m(N);
+    std::vector<double> k_l(N);
+
+    std::vector<double> k_w(N);
+
+    std::vector<double> mu_l(N);
+    std::vector<double> mu_m(N);
+
+    std::vector<double> Re_v(N);
+    std::vector<double> Pr_v(N);
+
+    bool mass_sources = 1;
+    bool heat_sources_xw = 1;
+    bool heat_sources_xv_mass = 1;
+    bool heat_sources_xv_heat = 1;
+    bool external_heat = 1;
 
     #pragma endregion
 
@@ -423,125 +520,17 @@ int main() {
     mesh_output.flush();
     mesh_output.close();
 
-    // Vapor Equation of State update function. Updates density
-    auto eos_update = [&](std::vector<double>& rho_, const std::vector<double>& p_, const std::vector<double>& T_) {
-
-        for (int i = 0; i < N; i++) { rho_[i] = std::max(1e-6, p_[i] / (Rv * T_[i])); }
-
-    }; eos_update(rho_m, p_m, T_m);
-
-    // Differences between the heat exchanged at interfaces due to linearization (should be zero to machine precision)
-    std::vector<double> power_residual_xw(N, 0);
-    std::vector<double> heat_residual_xv(N, 0);
-
-    // Heat exchange balance liquid vapor
-    std::vector<double> heat_conduction_flux(N, 0.0);
-    std::vector<double> heat_convection_flux(N, 0.0);
-    std::vector<double> heat_phase_flux(N, 0.0);
-
-    std::vector<double> C1(N, 0.0), C2(N, 0.0), C3(N, 0.0), C4(N, 0.0), C5(N, 0.0), C6(N, 0.0), C7(N, 0.0), C8(N, 0.0), C9(N, 0.0), C10(N, 0.0), C11(N, 0.0), C12(N, 0.0)
-        , C13(N, 0.0), C14(N, 0.0), C15(N, 0.0), C16(N, 0.0), C17(N, 0.0), C18(N, 0.0), C19(N, 0.0), C20(N, 0.0), C21(N, 0.0), C22(N, 0.0), C23(N, 0.0), C24(N, 0.0), C25(N, 0.0)
-        , C26(N, 0.0), C27(N, 0.0), C28(N, 0.0), C29(N, 0.0), C30(N, 0.0), C31(N, 0.0), C32(N, 0.0), C33(N, 0.0), C34(N, 0.0), C35(N, 0.0), C36(N, 0.0), C37(N, 0.0), C38(N, 0.0)
-        , C39(N, 0.0), C40(N, 0.0), C41(N, 0.0), C42(N, 0.0), C43(N, 0.0), C44(N, 0.0), C45(N, 0.0), C46(N, 0.0), C47(N, 0.0), C48(N, 0.0), C49(N, 0.0), C50(N, 0.0), C51(N, 0.0)
-        , C52(N, 0.0), C53(N, 0.0), C54(N, 0.0), C55(N, 0.0), C56(N, 0.0), C57(N, 0.0), C58(N, 0.0), C59(N, 0.0), C60(N, 0.0), C61(N, 0.0), C62(N, 0.0), C63(N, 0.0), C64(N, 0.0)
-        , C65(N, 0.0), C66(N, 0.0), C67(N, 0.0), C68(N, 0.0), C69(N, 0.0), C70(N, 0.0), C71(N, 0.0), C72(N, 0.0), C73(N, 0.0), C74(N, 0.0), C75(N, 0.0);
-
-    std::vector<double> H_xm(N, 0.0);
-    std::vector<double> Dh(N, 0.0);
-
-    std::vector<double> heat_balance_xv_1(N, 0.0);
-    std::vector<double> heat_balance_xv_2(N, 0.0);
-    std::vector<double> heat_balance_xv_3(N, 0.0);
-    std::vector<double> heat_balance_xv_4(N, 0.0);
-    std::vector<double> heat_balance_xv_5(N, 0.0);
-
-    std::vector<double> a_x(N, 0.0);
-    std::vector<double> b_x(N, 0.0);
-    std::vector<double> c_x(N, 0.0);
-    std::vector<double> a_w(N, 0.0);
-    std::vector<double> b_w(N, 0.0);
-    std::vector<double> c_w(N, 0.0);
-
-    std::vector<double> T_sur_lin(N, 0.0);
-    std::vector<double> T_sur_diff(N, 0.0);
-
-    std::vector<double> balance_condition(N, 0.0);
-
-    std::vector<double> alpha1(N, 0.0);
-    std::vector<double> alpha2(N, 0.0);
-    std::vector<double> alpha3(N, 0.0);
-    std::vector<double> alpha4(N, 0.0);
-    std::vector<double> alpha5(N, 0.0);
-    std::vector<double> alpha6(N, 0.0);
-    std::vector<double> alpha7(N, 0.0);
-    std::vector<double> alpha8(N, 0.0);
-    std::vector<double> alpha9(N, 0.0);
-    std::vector<double> alpha10(N, 0.0);
-    std::vector<double> alpha11(N, 0.0);
-    std::vector<double> alpha12(N, 0.0);
-    std::vector<double> delta(N, 0.0);
-
-    std::vector<double> residual1(N, 0.0);
-    std::vector<double> residual2(N, 0.0);
-    std::vector<double> residual3(N, 0.0);
-    std::vector<double> residual4(N, 0.0);
-    std::vector<double> residual5(N, 0.0);
-    std::vector<double> residual6(N, 0.0);
-
-    std::vector<double> Ex3(N, 0.0);
-    std::vector<double> Ex4(N, 0.0);
-    std::vector<double> Ex5(N, 0.0);
-    std::vector<double> Ex6(N, 0.0);
-    std::vector<double> Ex7(N, 0.0);
-    std::vector<double> Ex8(N, 0.0);
-
-    std::vector<double> power_residual_xv(N, 0.0);
-
-    // ------ Properties
-
-    std::vector<double> cp_m(N, vapor_sodium::cp_g_linear());
-    std::vector<double> cp_m_old = cp_m;
-
-    std::vector<double> cp_l(N, liquid_sodium::cp_l_linear());
-    std::vector<double> cp_l_old = cp_l;
-
-    std::vector<double> cp_w(N, steel::cp(T_left));
-    std::vector<double> cp_w_old = cp_w;
-
-    std::vector<double> k_m(N, 0.0);
-    std::vector<double> k_l(N, 0.0);
-
-    std::vector<double> k_w(N, 0.0);
-
-    std::vector<double> mu_l(N, 0.0);
-    std::vector<double> mu_m(N, 0.0);
-
-    std::vector<double> Re_v(N, 0.0);
-    std::vector<double> Pr_v(N, 0.0);
-
-    std::vector<double> dPsat_dT(N, 0.0);
-
-    std::vector<double> T_sur_old(N, 0.0);
-    std::vector<double> Gamma_xv_iter(N, 0.0);
-    std::vector<double> Gamma_xv_old(N, 0.0);
-
-    T_sur_old = T_sur;
-    Gamma_xv_iter = Gamma_xv;
-    Gamma_xv_old = Gamma_xv;
-
-    bool mass_sources = 1;
-    bool heat_sources_xw = 1;
-    bool heat_sources_xv_mass = 1;
-    bool heat_sources_xv_heat = 1;
-    bool external_heat = 1;
-
     #pragma endregion
+
+    int n = 0;
 
     // Start computational time measurement of whole simulation
     auto t_start_simulation = std::chrono::high_resolution_clock::now();
 
     // Time-stepping loop
     while (time_total < time_simulation) {
+
+        n++;
 
         // Start computational time iteration
         auto t_start_timestep = std::chrono::high_resolution_clock::now();
@@ -552,7 +541,7 @@ int main() {
         if (dt < 1e-12) {
             
             std::cout << "Timestep under 1e-12, convergence not achieved." << std::endl;
-            std::cout << "Time: " << time_total << std::endl;
+            std::cout << "Time: " << time_total << ", iteration: " << n << std::endl;
             system("pause");
             
             return 1;
@@ -573,15 +562,15 @@ int main() {
             mu_m[i] = liquid_sodium::mu(T_m[i]);
 
             // Update heat fluxes at the interfaces
-            if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;       /// Evaporator imposed heat flux [W/m2]
+            if (i <= evaporator_nodes) q_pp[i] = q_pp_evaporator;       // Evaporator imposed heat flux [W/m2]
             else if (i >= (N - condenser_nodes)) {
 
                 double conv = h_conv *
-                    (T_w_iter[i] - T_env);                              /// Condenser convective heat flux [W/m2]
+                    (T_w_iter[i] - T_env);                              // Condenser convective heat flux [W/m2]
                 double irr = emissivity * sigma *
-                    (std::pow(T_w_iter[i], 4) - std::pow(T_env, 4));    /// Condenser irradiation heat flux [W/m2]
+                    (std::pow(T_w_iter[i], 4) - std::pow(T_env, 4));    // Condenser irradiation heat flux [W/m2]
 
-                q_pp[i] = -(conv + irr);                                /// Heat flux at the outer wall [W/m2] (positive if to the wall) 
+                q_pp[i] = -(conv + irr);                                // Heat flux at the outer wall [W/m2] (positive if to the wall) 
             }
         }
 
@@ -648,11 +637,11 @@ int main() {
                 Gamma_xv[i] = Kgeom * (sigma_e * vapor_sodium::P_sat(T_sur_iter[i]) - sigma_c * p_m[i]);
 
                 // Physical properties
-                Re_v[i] = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_m[i];              /// Reynolds number [-]
-                Pr_v[i] = cp_m[i] * mu_m[i] / k_m[i];                                                 /// Prandtl number [-] 
-                H_xm[i] = vapor_sodium::h_conv(Re_v[i], Pr_v[i], k_m[i], Dh_v);     /// Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                           /// Saturation pressure [Pa]         
-                dPsat_dT[i] = vapor_sodium::dP_sat_dT(T_sur_iter[i]);                           /// Derivative of the saturation pressure wrt T [Pa/K]   
+                Re_v[i] = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_m[i];              // Reynolds number [-]
+                Pr_v[i] = cp_m[i] * mu_m[i] / k_m[i];                                                 // Prandtl number [-] 
+                H_xm[i] = vapor_sodium::h_conv(Re_v[i], Pr_v[i], k_m[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                           // Saturation pressure [Pa]         
+                dPsat_dT[i] = vapor_sodium::dP_sat_dT(T_sur_iter[i]);                           // Derivative of the saturation pressure wrt T [Pa/K]   
 
                 // Gamma coefficients definition (everything is calculated using iter (k-iteration) values)
 
@@ -1872,19 +1861,12 @@ int main() {
                 eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
                 L_pic[6] += eps;
 
-                // v_l
-                Aold = v_l_iter[i];
-                Anew = X[i][7];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[7] += eps;
-
                 // v_l  — norma mista (robusta per v ~ 0)
                 Aold = v_l_iter[i];
                 Anew = X[i][7];
 
                 // scala fisica per la velocità del liquido
-                const double v_abs_tol = 1e-8;        // [m/s] rumore numerico accettabile
+                const double v_abs_tol = 1e-8;      // [m/s] rumore numerico accettabile
                 const double v_scale = 1e-4;        // [m/s] scala fisica minima (regola pratica)
 
                 denom = std::max({ std::abs(Aold), std::abs(Anew), v_scale, v_abs_tol });
@@ -2054,7 +2036,7 @@ int main() {
             for (int k = 0; k < B; ++k)
                 conv_all = conv_all && conv_var[k];
 
-            /// Picard --> iter = new
+            // Picard --> iter = new
             rho_m_iter = rho_m;
             rho_l_iter = rho_l;
             alpha_m_iter = alpha_m;
@@ -2084,7 +2066,7 @@ int main() {
 
             if (conv_all) {
 
-                halves = 0;             // Reset halves if Picard converged
+                halves -= 1;             // Reset halves if Picard converged
                 break;                  // Picard converged, so break the loops
             }
         }
@@ -2187,9 +2169,9 @@ int main() {
                     Gamma_xv_lin_error[i] = Gamma_xv[i] - Gamma_xv_lin[i];
                     Gamma_xv_diff_error[i] = Gamma_xv_approx[i] - Gamma_xv_lin[i];
 
-                    Gamma_xv_approx_error_output << Gamma_xv_approx_error[i] << " ";
-                    Gamma_xv_lin_error_output << Gamma_xv_lin_error[i] << " ";
-                    Gamma_xv_diff_error_output << Gamma_xv_diff_error[i] << " ";
+                    Gamma_xv_approx_error_output << Gamma_xv_approx_error[i] * dz * (M_PI * r_v * r_v) << " ";
+                    Gamma_xv_lin_error_output << Gamma_xv_lin_error[i] * dz * (M_PI * r_v * r_v) << " ";
+                    Gamma_xv_diff_error_output << Gamma_xv_diff_error[i] * dz * (M_PI * r_v * r_v) << " ";
 
                     // Check residual heat exchange liquid wall
 

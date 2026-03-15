@@ -114,9 +114,9 @@ names = [
 
     "T_sur difference",
 
-    "Gamma_xv approximation error",
-    "Gamma_xv linearization error",
-    "Gamma_xv difference error",
+    "Mass flow rate approximation error",
+    "Mass flow rate linearization error",
+    "Mass flow rate difference error",
 ]
 
 units = [
@@ -132,9 +132,9 @@ units = [
 
     "[K]",
 
-    "[kg/m3s]",
-    "[kg/m3s]",
-    "[kg/m3s]",
+    "[kg/s]",
+    "[kg/s]",
+    "[kg/s]",
 ]
 
 # ============================================================
