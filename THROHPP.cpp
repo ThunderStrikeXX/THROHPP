@@ -81,12 +81,12 @@ int main() {
     const double q_pp_evaporator = power / (2 * M_PI * evaporator_length * r_o);    /// Heat flux at evaporator from given power [W/m^2]
 
     // Time-stepping parameters
-    double dt_user = 1e-10;                              /// Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-5;                              /// Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                /// Actual used time step [s]
     double time_simulation = 5000;                      // 
     double time_total = 0.0;                            /// Total time elapsed [s]
     double t_last_print = 0.0;
-    double print_interval = 1e-8;
+    double print_interval = 1e-9;
     int halves = 0;                                     /// Number of times the time step has been halved [-]
 
     // Picard loops parameters	          
@@ -97,15 +97,15 @@ int main() {
     std::array<double, B> pic_tol = {                   /// Tolerance for the convergence of Picard loop [-]
         1e-6,  // rho_m
         1e-6,  // rho_l
-        1e-4,  // alpha_m
-        1e-4,  // alpha_l
+        1e-3,  // alpha_m
+        1e-3,  // alpha_l
         1e-2,  // p_m
         1e-2,  // p_l
-        1e-6,  // v_m
-        1e-6,  // v_l
-        1e-4,  // T_m
-        1e-4,  // T_l
-        1e-4   // T_w
+        1e-4,  // v_m
+        1e-4,  // v_l
+        1e-3,  // T_m
+        1e-3,  // T_l
+        1e-3   // T_w
     };
 
     // Mesh z positions
@@ -222,8 +222,6 @@ int main() {
     std::vector<double> T_w_iter = T_w;
 
     std::vector<double> T_sur_iter = T_sur;
-
-    std::vector<double> phi_x_v_iter(N, 0.0);
 
     // Blocks definition
     std::vector<SparseBlock> L(N), D(N), R(N);
@@ -523,6 +521,14 @@ int main() {
 
     std::vector<double> dPsat_dT(N, 0.0);
 
+    std::vector<double> T_sur_old(N, 0.0);
+    std::vector<double> Gamma_xv_iter(N, 0.0);
+    std::vector<double> Gamma_xv_old(N, 0.0);
+
+    T_sur_old = T_sur;
+    Gamma_xv_iter = Gamma_xv;
+    Gamma_xv_old = Gamma_xv;
+
     bool mass_sources = 1;
     bool heat_sources_xw = 1;
     bool heat_sources_xv_mass = 1;
@@ -543,7 +549,14 @@ int main() {
         // Timestep selection
         dt = dt_user * pow(0.5, halves);    // Halfing of the timestep up to a lower bound     
 
-        if (dt < 1e-12) return 1;
+        if (dt < 1e-12) {
+            
+            std::cout << "Timestep under 1e-12, convergence not achieved." << std::endl;
+            std::cout << "Time: " << time_total << std::endl;
+            system("pause");
+            
+            return 1;
+        }
 
         // Updating all properties
         for (std::size_t i = 0; i < N; ++i) {
@@ -631,6 +644,9 @@ int main() {
 
                 #pragma region coefficients
 
+                T_sur[i] = C31[i] * p_m[i] + C32[i] * T_m[i] + C33[i] * T_l[i] + C34[i] * T_w[i] + C35[i];
+                Gamma_xv[i] = Kgeom * (sigma_e * vapor_sodium::P_sat(T_sur_iter[i]) - sigma_c * p_m[i]);
+
                 // Physical properties
                 Re_v[i] = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_m[i];              /// Reynolds number [-]
                 Pr_v[i] = cp_m[i] * mu_m[i] / k_m[i];                                                 /// Prandtl number [-] 
@@ -643,13 +659,11 @@ int main() {
                 const double beta = 1.0 / std::sqrt(2.0 * M_PI * Rv * T_sur_iter[i]);
 
                 cGamma[i] = - (Kgeom * beta * sigma_c);
-                bGamma[i] = - (Gamma_xv[i] / (2 * T_sur_iter[i])) + (Kgeom * beta * sigma_e * dPsat_dT[i]);
-                aGamma[i] = Gamma_xv[i] - bGamma[i] * T_sur_iter[i];
-
-                Gamma_xv[i] = Kgeom * (sigma_e * p_saturation[i] - sigma_c * 1.0 * p_m_iter[i]);
-
+                bGamma[i] = - (Gamma_xv_iter[i] / (2 * T_sur_iter[i])) + (Kgeom * beta * sigma_e * dPsat_dT[i]);
+                aGamma[i] = Gamma_xv_iter[i] - bGamma[i] * T_sur_iter[i];
+                
                 // Definition of the enthalpies (as in THROHPUT)
-                if (Gamma_xv[i] >= 0.0) {
+                if (Gamma_xv_iter[i] >= 0.0) {
 
                     // Evaporation case
                     h_xv_v = vapor_sodium::h_g_linear(T_sur_iter[i]);
@@ -1904,27 +1918,32 @@ int main() {
             for (int k = 0; k < B; ++k)
                 L_pic[k] /= N;
 
-            double alpha = 1.0;
+            double alpha = 0.1;
 
             // Update vectors from X
-            for (int i = 0; i < N; ++i) {
+            for (int i = 1; i < N - 1; ++i) {
 
-                rho_m[i] = alpha * X[i][0] + (1 - alpha) * rho_m[i];
-                rho_l[i] = alpha * X[i][1] + (1 - alpha) * rho_l[i];
-                alpha_m[i] = alpha * X[i][2] + (1 - alpha) * alpha_m[i];
-                alpha_l[i] = alpha * X[i][3] + (1 - alpha) * alpha_l[i];
-                p_m[i] = alpha * X[i][4] + (1 - alpha) * p_m[i];
-                p_l[i] = alpha * X[i][5] + (1 - alpha) * p_l[i];
-                v_m[i] = alpha * X[i][6] + (1 - alpha) * v_m[i];
-                v_l[i] = alpha * X[i][7] + (1 - alpha) * v_l[i];
-                T_m[i] = alpha * X[i][8] + (1 - alpha) * T_m[i];
-                T_l[i] = alpha * X[i][9] + (1 - alpha) * T_l[i];
-                T_w[i] = alpha * X[i][10] + (1 - alpha) * T_w[i];
+                rho_m[i] = alpha * X[i][0] + (1 - alpha) * rho_m_iter[i];
+                rho_l[i] = alpha * X[i][1] + (1 - alpha) * rho_l_iter[i];
+                alpha_m[i] = alpha * X[i][2] + (1 - alpha) * alpha_m_iter[i];
+                alpha_l[i] = alpha * X[i][3] + (1 - alpha) * alpha_l_iter[i];
+                p_m[i] = alpha * X[i][4] + (1 - alpha) * p_m_iter[i];
+                p_l[i] = alpha * X[i][5] + (1 - alpha) * p_l_iter[i];
+                v_m[i] = alpha * X[i][6] + (1 - alpha) * v_m_iter[i];
+                v_l[i] = alpha * X[i][7] + (1 - alpha) * v_l_iter[i];
+                T_m[i] = alpha * X[i][8] + (1 - alpha) * T_m_iter[i];
+                T_l[i] = alpha * X[i][9] + (1 - alpha) * T_l_iter[i];
+                T_w[i] = alpha * X[i][10] + (1 - alpha) * T_w_iter[i];
+
+                T_sur[i] = alpha * (C31[i] * p_m[i] + C32[i] * T_m[i] + C33[i] * T_l[i] + C34[i] * T_w[i] + C35[i]) + (1 - alpha) * T_sur_iter[i];
+                Gamma_xv[i] = alpha * (Kgeom * (sigma_e * vapor_sodium::P_sat(T_sur[i]) - sigma_c * p_m[i])) + (1 - alpha) * Gamma_xv_iter[i];
             }
+
+            bool found_nan = false;
 
             // After solving the linear system, before updating variables
             for (int i = 0; i < N; ++i) {
-                bool found_nan = false;
+
                 std::string var_name;
                 double var_val;
 
@@ -1957,14 +1976,13 @@ int main() {
                             << " p_m=" << p_m[i + 1] << " T_l=" << T_l[i + 1]
                             << " T_w=" << T_w[i + 1] << std::endl;
                     }
-                    std::cout << "--- Key coefficients ---" << std::endl;
-                    std::cout << "Gamma_xv = " << Gamma_xv[i] << std::endl;
-                    std::cout << "alpha_m_iter = " << alpha_m_iter[i] << std::endl;
-                    std::cout << "T_sur_iter = " << T_sur_iter[i] << std::endl;
-                    std::cout << "p_m_iter = " << p_m_iter[i] << std::endl;
-                    
-                    return 1;
                 }
+            }
+
+            if (found_nan == true) {
+
+                pic = max_picard;
+                break;
             }
 
             /*
@@ -2051,6 +2069,7 @@ int main() {
             T_w_iter = T_w;
 
             T_sur_iter = T_sur;
+            Gamma_xv_iter = Gamma_xv;
 
             for (int i = 1; i < N; i++) {
 
@@ -2511,6 +2530,9 @@ int main() {
                 T_l_old = T_l;
                 T_w_old = T_w;
 
+                Gamma_xv_old = Gamma_xv;
+                T_sur_old = T_sur;
+
                 cp_l_old = cp_l;
                 cp_m_old = cp_m;
 
@@ -2535,6 +2557,9 @@ int main() {
 
             cp_l = cp_l_old;
             cp_m = cp_m_old;
+
+            T_sur = T_sur_old;
+            Gamma_xv = Gamma_xv_old;
 
             halves += 1;        // Half again the timestep
         }
