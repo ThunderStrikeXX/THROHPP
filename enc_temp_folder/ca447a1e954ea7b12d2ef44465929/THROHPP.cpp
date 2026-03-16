@@ -2337,6 +2337,56 @@ int main() {
                     global_energy_balance += q_pp[i] * (2 * M_PI * r_o * dz);       
                 }
 
+                {
+                    std::cout << "=== PRESSURE+CAP+FRIC COMPARISON ===" << std::endl;
+                    std::cout << std::setw(6) << "face"
+                        << std::setw(16) << "pres_matrix"
+                        << std::setw(16) << "pres_manual"
+                        << std::setw(16) << "cap_matrix"
+                        << std::setw(16) << "cap_manual"
+                        << std::setw(16) << "fric_matrix"
+                        << std::setw(16) << "fric_manual" << std::endl;
+
+                    double tot_pres_mat = 0, tot_pres_man = 0;
+                    double tot_cap_mat = 0, tot_cap_man = 0;
+                    double tot_fric_mat = 0, tot_fric_man = 0;
+
+                    for (int i = 2; i < N - 1; ++i) {
+                        // From matrix
+                        double pres_mat = eps_v * (alpha_l_iter[i - 1] + alpha_l_iter[i]) / (2 * dz) * (p_l[i] - p_l[i - 1]);
+                        double cap_mat = (DPcap[i - 1] + DPcap[i]) / (2 * dz) * (alpha_l[i] - alpha_l[i - 1]);
+                        double fric_mat = fl[i] * std::abs(v_l_iter[i]) * v_l[i];
+
+                        // From manual check (negated, since bal = -(pres+cap+fric))
+                        double pres_man = eps_v * (p_l[i] - p_l[i - 1]) * (alpha_l_iter[i - 1] + alpha_l_iter[i]) / (2 * dz);
+                        double cap_man = (alpha_l[i] - alpha_l[i - 1]) * (DPcap[i - 1] + DPcap[i]) / (2 * dz);
+                        double fric_man = fl[i] * std::abs(v_l_iter[i]) * v_l[i];
+
+                        double A = M_PI * r_i * r_i * dz;
+
+                        tot_pres_mat += pres_mat * A;
+                        tot_pres_man += pres_man * A;
+                        tot_cap_mat += cap_mat * A;
+                        tot_cap_man += cap_man * A;
+                        tot_fric_mat += fric_mat * A;
+                        tot_fric_man += fric_man * A;
+
+                        std::cout << std::setw(6) << i
+                            << std::setw(16) << std::scientific << std::setprecision(4) << pres_mat * A
+                            << std::setw(16) << pres_man * A
+                            << std::setw(16) << cap_mat * A
+                            << std::setw(16) << cap_man * A
+                            << std::setw(16) << fric_mat * A
+                            << std::setw(16) << fric_man * A << std::endl;
+                    }
+
+                    std::cout << "  TOTAL pres: matrix=" << tot_pres_mat << " manual=" << tot_pres_man << " diff=" << tot_pres_mat - tot_pres_man << std::endl;
+                    std::cout << "  TOTAL cap:  matrix=" << tot_cap_mat << " manual=" << tot_cap_man << " diff=" << tot_cap_mat - tot_cap_man << std::endl;
+                    std::cout << "  TOTAL fric: matrix=" << tot_fric_mat << " manual=" << tot_fric_man << " diff=" << tot_fric_mat - tot_fric_man << std::endl;
+                    std::cout << "  TOTAL -(p+c+f): matrix=" << -(tot_pres_mat + tot_cap_mat + tot_fric_mat)
+                        << " manual bal=" << -(tot_pres_man + tot_cap_man + tot_fric_man) << std::endl;
+}
+
                 // --------- Differences
 
                 diff_mass_m = (acc_mass_m - bal_mass_m);
