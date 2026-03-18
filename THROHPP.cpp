@@ -18,6 +18,18 @@
 #include "vapor_sodium.h"
 #include "solver.h"
 
+// Mathematical constants
+const double pi = 3.14159265358979323846;
+
+inline double ramp(double t) {
+    const double T = 100.0;
+
+    if (t <= 0.0) return 0.0;
+    if (t >= T)   return 1.0;
+
+    return std::sin(0.5 * pi * t / T);
+}
+
 int main() {
 
     // =======================================================================
@@ -27,9 +39,6 @@ int main() {
     // =======================================================================
 
     #pragma region constants_and_variables
-
-    // Mathematical constants
-    const double pi = 3.14159265358979323846;
 
     // Physical properties
     const double emissivity = 0.5;           // Wall emissivity [-]
@@ -103,17 +112,17 @@ int main() {
     std::array<double, B> L_pic;                        // Picard residuals [-]
     std::array<bool, B> conv_var;                       // Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   // Tolerance for the convergence of Picard loop [-]
-        1e-8,  // rho_m
-        1e-8,  // rho_l
-        1e-8,  // alpha_m
-        1e-8,  // alpha_l
-        1e-8,  // p_m
-        1e-8,  // p_l
-        1e-8,  // v_m
-        50,  // v_l
-        50,  // T_m
-        1e-8,  // T_l
-        1e-8   // T_w
+        1e-6,  // rho_m
+        1e-6,  // rho_l
+        1e-6,  // alpha_m
+        1e-6,  // alpha_l
+        1e-6,  // p_m
+        1e-6,  // p_l
+        1,     // v_m
+        1,     // v_l
+        1e-6,  // T_m
+        1e-6,  // T_l
+        1e-6   // T_w
     };
 
     // Mesh z positions
@@ -360,11 +369,9 @@ int main() {
     std::vector<double> fm(N, 0.0);
     std::vector<double> fl(N, 0.0);
 
-    bool mass_sources = 0;
-    bool heat_sources_xw = 0;
-    bool heat_sources_xv_mass = 0;
-    bool heat_sources_xv_heat = 0;
-    bool external_heat = 0;
+    bool heat_sources_xw = 1;
+    bool heat_sources_xv_heat = 1;
+    bool external_heat = 1;
 
     #pragma endregion
 
@@ -566,6 +573,12 @@ int main() {
 
     double beta = 0.0;
 
+    const double al = -2.359582e5;
+    const double bl = 1.256230e3;
+
+    const double ag = 4.683166e6;
+    const double bg = 3.589755e2;
+
     std::cout << "Case: " << name << std::endl;
 
     // Start computational time measurement of whole simulation
@@ -573,6 +586,9 @@ int main() {
 
     // Time-stepping loop
     while (time_total < time_simulation) {
+
+        double mass_sources = 0.0 /*ramp(time_total)*/;
+        double heat_sources_xv_mass = 0.0 /*ramp(time_total)*/;
 
         n++;
 
@@ -1943,7 +1959,7 @@ int main() {
             double alpha = 1.0;
 
             // Update vectors from X
-            for (int i = 1; i < N - 1; ++i) {
+            for (int i = 0; i < N; ++i) {
 
                 rho_m[i] = alpha * X[i][0] + (1 - alpha) * rho_m_iter[i];
                 rho_l[i] = alpha * X[i][1] + (1 - alpha) * rho_l_iter[i];
@@ -1964,6 +1980,9 @@ int main() {
             // Ghost cells
             Gamma_xv[0] = 0.0;
             Gamma_xv[N - 1] = 0.0;
+
+            T_sur[0] = T_sur[1];
+            T_sur[N - 1] = T_sur[N - 2];
 
             bool found_nan = false;
 
