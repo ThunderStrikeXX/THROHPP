@@ -241,14 +241,8 @@ def draw_node(i, update_slider=True):
     # curva principale: y(t, x_i)
     line.set_data(time, y[:, i])
 
-    if names[current_idx] == "Vapor velocity":
-        y_sonic = Y[names.index("Sonic speed")]
-        line2.set_data(time, y_sonic[:, i])
-        line2.set_visible(True)
-    else:
-        # dati coerenti per evitare errori nel draw
-        line2.set_data(time, np.full_like(time, np.nan))
-        line2.set_visible(False)
+    line2.set_data(time, np.full_like(time, np.nan))
+    line2.set_visible(False)
 
     ax.set_ylim(*robust_ylim(y[:, i]))
 

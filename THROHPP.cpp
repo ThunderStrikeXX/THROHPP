@@ -37,9 +37,9 @@ int main() {
     const double Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
 
     // Evaporation and condensation parameters
-    const double eps_s = 1e-6;                // Surface fraction of the liquid available for phasic interface [-]
-    const double sigma_e = 0.05;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.05;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const double eps_s = 0.5;                // Surface fraction of the liquid available for phasic interface [-]
+    const double sigma_e = 0.5;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 0.5;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
     double Omega = 1.0;                      // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
@@ -86,7 +86,7 @@ int main() {
     const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Time-stepping parameters
-    double dt_user = 1e-5;                              // Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-3;                              // Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                // Actual used time step [s]
     double time_simulation = 5000;                      // Simulation total number [s]
     double time_total = 0.0;                            // Total time elapsed [s]
@@ -99,7 +99,7 @@ int main() {
 
     // Picard loops parameters	          
     int pic = 0;                                        // Number of Picard iterations [-]
-    const int max_picard = 200;                         // Maximum number of Picard iterations per timestep [-]
+    const int max_picard = 10;                         // Maximum number of Picard iterations per timestep [-]
     std::array<double, B> L_pic;                        // Picard residuals [-]
     std::array<bool, B> conv_var;                       // Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   // Tolerance for the convergence of Picard loop [-]
@@ -360,11 +360,11 @@ int main() {
     std::vector<double> fm(N, 0.0);
     std::vector<double> fl(N, 0.0);
 
-    bool mass_sources = 1;
-    bool heat_sources_xw = 1;
-    bool heat_sources_xv_mass = 1;
-    bool heat_sources_xv_heat = 1;
-    bool external_heat = 1;
+    bool mass_sources = 0;
+    bool heat_sources_xw = 0;
+    bool heat_sources_xv_mass = 0;
+    bool heat_sources_xv_heat = 0;
+    bool external_heat = 0;
 
     #pragma endregion
 
@@ -564,6 +564,8 @@ int main() {
 
     #pragma endregion
 
+    double beta = 0.0;
+
     // Start computational time measurement of whole simulation
     auto t_start_simulation = std::chrono::high_resolution_clock::now();
 
@@ -627,6 +629,22 @@ int main() {
         // Picard iteration loop
         for (pic = 0; pic < max_picard; ++pic) {
 
+            // Picard --> iter = new
+            rho_m_iter = rho_m;
+            rho_l_iter = rho_l;
+            alpha_m_iter = alpha_m;
+            alpha_l_iter = alpha_l;
+            p_m_iter = p_m;
+            p_l_iter = p_l;
+            v_m_iter = v_m;
+            v_l_iter = v_l;
+            T_m_iter = T_m;
+            T_l_iter = T_l;
+            T_w_iter = T_w;
+
+            T_sur_iter = T_sur;
+            Gamma_xv_iter = Gamma_xv;
+
             // Cleaning all the blocks (the add function adds block and does not overwrite, so this is necessary)
             for (int i = 0; i < N; i++) {
                 L[i].row.clear(); L[i].col.clear(); L[i].val.clear();
@@ -683,9 +701,6 @@ int main() {
 
                 #pragma region coefficients
 
-                T_sur[i] = C31[i] * p_m[i] + C32[i] * T_m[i] + C33[i] * T_l[i] + C34[i] * T_w[i] + C35[i];
-                Gamma_xv[i] = Kgeom * (sigma_e * vapor_sodium::P_sat(T_sur_iter[i]) - sigma_c * p_m[i]);
-
                 // Physical properties
                 Re_v[i] = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_m[i];              // Reynolds number [-]
                 Pr_v[i] = cp_m[i] * mu_m[i] / k_m[i];                                                 // Prandtl number [-] 
@@ -695,7 +710,7 @@ int main() {
 
                 // Gamma coefficients definition (everything is calculated using iter (k-iteration) values)
 
-                const double beta = 1.0 / std::sqrt(2.0 * pi * Rv * T_sur_iter[i]);
+                beta = 1.0 / std::sqrt(2.0 * pi * Rv * T_sur_iter[i]);
 
                 cGamma[i] = - (Kgeom * beta * sigma_c);
                 bGamma[i] = - (Gamma_xv_iter[i] / (2 * T_sur_iter[i])) + (Kgeom * beta * sigma_e * dPsat_dT[i]);
@@ -1929,7 +1944,7 @@ int main() {
             for (int k = 0; k < B; ++k)
                 L_pic[k] /= N;
 
-            double alpha = 0.5;
+            double alpha = 1.0;
 
             // Update vectors from X
             for (int i = 1; i < N - 1; ++i) {
@@ -1947,8 +1962,12 @@ int main() {
                 T_w[i] = alpha * X[i][10] + (1 - alpha) * T_w_iter[i];
 
                 T_sur[i] = alpha * (C31[i] * p_m[i] + C32[i] * T_m[i] + C33[i] * T_l[i] + C34[i] * T_w[i] + C35[i]) + (1 - alpha) * T_sur_iter[i];
-                Gamma_xv[i] = alpha * (Kgeom * (sigma_e * vapor_sodium::P_sat(T_sur[i]) - sigma_c * p_m[i])) + (1 - alpha) * Gamma_xv_iter[i];
+                Gamma_xv[i] = alpha * (Kgeom * beta * (sigma_e * vapor_sodium::P_sat(T_sur[i]) - sigma_c * p_m[i])) + (1 - alpha) * Gamma_xv_iter[i];
             }
+
+            // Ghost cells
+            Gamma_xv[0] = 0.0;
+            Gamma_xv[N - 1] = 0.0;
 
             bool found_nan = false;
 
@@ -2066,9 +2085,6 @@ int main() {
             for (int k = 0; k < B; ++k)
                 conv_all = conv_all && conv_var[k];
 
-            T_sur_iter = T_sur;
-            Gamma_xv_iter = Gamma_xv;
-
             for (int i = 1; i < N; i++) {
 
                 power_flux_wx[i] = (C61[i] * p_m[i] + C62[i] * T_m[i] + C63[i] * T_l[i] + C64[i] * T_w[i] + C65[i]) * pi * (r_i * r_i) * dz;
@@ -2086,19 +2102,6 @@ int main() {
                 halves = std::max(0, --halves);
                 break;                                      // Picard converged, so break the loops
             }
-
-            // Picard --> iter = new
-            rho_m_iter = rho_m;
-            rho_l_iter = rho_l;
-            alpha_m_iter = alpha_m;
-            alpha_l_iter = alpha_l;
-            p_m_iter = p_m;
-            p_l_iter = p_l;
-            v_m_iter = v_m;
-            v_l_iter = v_l;
-            T_m_iter = T_m;
-            T_l_iter = T_l;
-            T_w_iter = T_w;
         }
 
         // Picard converged or max iterations reached
@@ -2120,7 +2123,6 @@ int main() {
 
                 for (int i = 1; i < N - 1; ++i) {
 
-                    
                     v_velocity_output << X[i][6] << " ";
                     v_pressure_output << X[i][4] << " ";
                     v_temperature_output << X[i][8] << " ";
