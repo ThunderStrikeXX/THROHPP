@@ -110,8 +110,8 @@ int main() {
         1e-8,  // p_m
         1e-8,  // p_l
         1e-8,  // v_m
-        1e-8,  // v_l
-        1e-8,  // T_m
+        50,  // v_l
+        50,  // T_m
         1e-8,  // T_l
         1e-8   // T_w
     };
@@ -565,6 +565,8 @@ int main() {
     #pragma endregion
 
     double beta = 0.0;
+
+    std::cout << "Case: " << name << std::endl;
 
     // Start computational time measurement of whole simulation
     auto t_start_simulation = std::chrono::high_resolution_clock::now();
@@ -1902,22 +1904,16 @@ int main() {
                 // v_m
                 Aold = v_m_iter[i];
                 Anew = X[i][6];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[6] += eps;
+                denom = std::max({ std::abs(Aold), std::abs(Anew), 1e-3 });
+                eps = std::abs(Anew - Aold) / denom;
+                L_pic[6] = std::max(L_pic[6], eps);
 
-                // v_l  — norma mista (robusta per v ~ 0)
+                // v_l
                 Aold = v_l_iter[i];
                 Anew = X[i][7];
-
-                // scala fisica per la velocità del liquido
-                const double v_abs_tol = 1e-8;      // [m/s] rumore numerico accettabile
-                const double v_scale = 1e-4;        // [m/s] scala fisica minima (regola pratica)
-
-                denom = std::max({ std::abs(Aold), std::abs(Anew), v_scale, v_abs_tol });
+                denom = std::max({ std::abs(Aold), std::abs(Anew), 1e-5 });
                 eps = std::abs(Anew - Aold) / denom;
-
-                L_pic[7] += eps;
+                L_pic[7] = std::max(L_pic[7], eps);
 
                 // T_m
                 Aold = T_m_iter[i];
