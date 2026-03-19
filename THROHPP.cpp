@@ -37,9 +37,9 @@ int main() {
     const double Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
 
     // Evaporation and condensation parameters
-    const double eps_s = 0.5;                // Surface fraction of the liquid available for phasic interface [-]
-    const double sigma_e = 0.5;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.5;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const double eps_s = 1.0;                // Surface fraction of the liquid available for phasic interface [-]
+    const double sigma_e = 0.05;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 0.05;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
     double Omega = 1.0;                      // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
@@ -86,7 +86,7 @@ int main() {
     const double Evi2 = 0.5 * (r_i * r_i + r_v * r_v);
 
     // Time-stepping parameters
-    double dt_user = 1e-3;                              // Initial time step [s] (then it is updated according to the limits)
+    double dt_user = 1e-4;                              // Initial time step [s] (then it is updated according to the limits)
     double dt = dt_user;                                // Actual used time step [s]
     double time_simulation = 5000;                      // Simulation total number [s]
     double time_total = 0.0;                            // Total time elapsed [s]
@@ -95,7 +95,7 @@ int main() {
 
     // Printing parameters
     double t_last_print = 0.0;                          // Time from last print [s]
-    const double print_interval = 1e-1;                 // Time interval for printing [s]
+    const double print_interval = 1e-2;                 // Time interval for printing [s]
 
     // Picard loops parameters	          
     int pic = 0;                                        // Number of Picard iterations [-]
@@ -117,8 +117,8 @@ int main() {
     };
 
     // Mesh z positions
-    std::vector<double> mesh(N - 2, 0.0);
-    for (int i = 0; i < N - 2; ++i) mesh[i] = i * dz;     // Mesh discretization
+    std::vector<double> mesh(N, 0.0);
+    for (int i = 0; i < N; ++i) mesh[i] = (i - 0.5) * dz;     // Mesh discretization
 
     // State variables definition and initialization
     std::vector<double> rho_m(N);                   // Mixture density [kg/m3]
@@ -200,7 +200,7 @@ int main() {
     std::vector<double> w(N, 0.0);
 
     // Evaporator cosine distribution
-    for (int i = 1; i < N - 2; ++i) {
+    for (int i = 0; i < N; ++i) {
 
         if (mesh[i] >= evaporator_start - delta_h &&
             mesh[i] <= evaporator_end + delta_h) {
@@ -360,11 +360,11 @@ int main() {
     std::vector<double> fm(N, 0.0);
     std::vector<double> fl(N, 0.0);
 
-    bool mass_sources = 0;
-    bool heat_sources_xw = 0;
-    bool heat_sources_xv_mass = 0;
-    bool heat_sources_xv_heat = 0;
-    bool external_heat = 0;
+    bool mass_sources = 1;
+    bool heat_sources_xw = 1;
+    bool heat_sources_xv_mass = 1;
+    bool heat_sources_xv_heat = 1;
+    bool external_heat = 1;
 
     #pragma endregion
 
@@ -1118,10 +1118,10 @@ int main() {
                     - (rho_m_iter[i] * cp_m[i] * T_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (v_m_iter[i + 1] - v_m_iter[i]) / (2 * dz)
+                    // + p_m_iter[i] * (v_m_iter[i + 1] - v_m_iter[i]) / (2 * dz)
 
                     // Pressure II term
-                    + p_m_iter[i] / dt
+                    // + p_m_iter[i] / dt
                 );
 
                 add(D[i], 2, 4, 0.0
@@ -1138,7 +1138,7 @@ int main() {
                     - (alpha_m_iter[i] * rho_m_iter[i] * cp_m[i] * T_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
-                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
+                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
                 );
 
                 add(D[i], 2, 8, 0.0
@@ -1188,11 +1188,11 @@ int main() {
                         ) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i + 1] / (2 * dz)
-                    - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i] / (2 * dz)
+                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) * v_m_iter[i + 1] / (2 * dz)
+                    // - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) * v_m_iter[i] / (2 * dz)
 
                     // Pressure II term
-                    + (p_m_iter[i] * alpha_m_old[i]) / dt
+                    // + (p_m_iter[i] * alpha_m_old[i]) / dt
 
                     // Source term
                     + C50[i] * heat_sources_xv_heat                    // Heat source due to heat flux from wick
@@ -1211,7 +1211,7 @@ int main() {
                     - (rho_m_iter[i - 1] * cp_m[i - 1] * T_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])) / dz
 
                     // Pressure I term
-                    - p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
+                    // - p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
                 );
 
                 add(L[i], 2, 8, 0.0
@@ -1235,13 +1235,13 @@ int main() {
                     + (rho_m_iter[i + 1] * cp_m[i + 1] * T_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
 
                     // Pressure I term
-                    + p_m_iter[i] * (v_m_iter[i + 1]) / (2 * dz)
+                    // + p_m_iter[i] * (v_m_iter[i + 1]) / (2 * dz)
                 );
 
                 add(R[i], 2, 6, 0.0
 
                     // Pressure I term
-                    + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
+                    // + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
 
                     // Convective term
                     + (alpha_m_iter[i] * rho_m_iter[i] * cp_m[i] * T_m_iter[i] * H(v_m_iter[i + 1])) / dz
