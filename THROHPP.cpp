@@ -146,7 +146,7 @@ int main() {
 
     // Printing parameters
     double t_last_print = 0.0;                          // Time from last print [s]
-    const double print_interval = 0.5;                 // Time interval for printing [s]
+    const double print_interval = 0.1;                 // Time interval for printing [s]
 
     // Picard loops parameters	          
     int pic = 0;                                        // Number of Picard iterations [-]
@@ -419,7 +419,7 @@ int main() {
     std::vector<double> fm(N, 0.0);
     std::vector<double> fl(N, 0.0);
 
-    bool mass_sources = 0;
+    bool mass_sources = 1;
     bool heat_sources_xw = 1;
     bool heat_sources_xv_mass = 0;
     bool heat_sources_xv_heat = 1;
