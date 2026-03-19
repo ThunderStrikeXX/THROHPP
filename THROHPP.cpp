@@ -46,9 +46,9 @@ int main() {
     const double Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
 
     // Evaporation and condensation parameters
-    const double eps_s = 0.5;                // Surface fraction of the liquid available for phasic interface [-]
-    const double sigma_e = 0.5;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
-    const double sigma_c = 0.5;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
+    const double eps_s = 1.0;                // Surface fraction of the liquid available for phasic interface [-]
+    const double sigma_e = 0.05;             // Evaporation accomodation coefficient [-]. 1 means optimal evaporation
+    const double sigma_c = 0.05;             // Condensation accomodation coefficient [-]. 1 means optimal condensation
     double Omega = 1.0;                      // Initialization of Omega parameter for evaporation/condensation model [-]
 
     // Wick permeability parameters
@@ -104,7 +104,7 @@ int main() {
 
     // Printing parameters
     double t_last_print = 0.0;                          // Time from last print [s]
-    const double print_interval = 1e-1;                 // Time interval for printing [s]
+    const double print_interval = 1e-5;                 // Time interval for printing [s]
 
     // Picard loops parameters	          
     int pic = 0;                                        // Number of Picard iterations [-]
@@ -126,8 +126,8 @@ int main() {
     };
 
     // Mesh z positions
-    std::vector<double> mesh(N - 2, 0.0);
-    for (int i = 0; i < N - 2; ++i) mesh[i] = i * dz;     // Mesh discretization
+    std::vector<double> mesh(N, 0.0);
+    for (int i = 0; i < N; ++i) mesh[i] = (i - 0.5) * dz;     // Mesh discretization
 
     // State variables definition and initialization
     std::vector<double> rho_m(N);                   // Mixture density [kg/m3]
@@ -199,8 +199,8 @@ int main() {
 
     for (int i = 2; i < N - 1; i++) {
 
-        v_m[i] = 1.0;
-        v_l[i] = -0.1;
+        v_m[i] = 10.0;
+        v_l[i] = -0.0001;
     }
 
 
@@ -1117,21 +1117,21 @@ int main() {
                 add(D[i], 2, 0, 0.0
 
                     // Temporal term
-                    + (alpha_m_iter[i] * cp_m[i] * T_m_iter[i]) / dt
+                    + alpha_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) / dt
 
                     // Convective term
-                    + (alpha_m_iter[i] * cp_m[i] * T_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
-                    - (alpha_m_iter[i] * cp_m[i] * T_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                    + (alpha_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
+                    - (alpha_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
                 );
 
                 add(D[i], 2, 2, 0.0
 
                     // Temporal term
-                    + (T_m_iter[i] * rho_m_iter[i] * cp_m[i]) / dt
+                    + rho_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) / dt
 
                     // Convective term
-                    + (rho_m_iter[i] * cp_m[i] * T_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
-                    - (rho_m_iter[i] * cp_m[i] * T_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                    + (rho_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) * v_m_iter[i + 1] * H(v_m_iter[i + 1])) / dz
+                    - (rho_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) * v_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
                     + p_m_iter[i] * (v_m_iter[i + 1] - v_m_iter[i]) / (2 * dz)
@@ -1150,8 +1150,8 @@ int main() {
                 add(D[i], 2, 6, 0.0
 
                     // Convective term
-                    - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cp_m[i - 1] * T_m_iter[i - 1] * H(v_m_iter[i])) / dz
-                    - (alpha_m_iter[i] * rho_m_iter[i] * cp_m[i] * T_m_iter[i] * (1 - H(v_m_iter[i]))) / dz
+                    - (alpha_m_iter[i - 1] * rho_m_iter[i - 1] * (ag + cp_m[i - 1] * T_m_iter[i - 1]) * H(v_m_iter[i])) / dz
+                    - (alpha_m_iter[i] * rho_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) * (1 - H(v_m_iter[i]))) / dz
 
                     // Pressure I term
                     - p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i + 1]) / (2 * dz)
@@ -1160,7 +1160,7 @@ int main() {
                 add(D[i], 2, 8, 0.0
 
                     // Temporal term
-                    + (alpha_m_iter[i] * rho_m_iter[i] * cp_m[i]) / dt
+                    + alpha_m_iter[i] * rho_m_iter[i] * cp_m[i] / dt
 
                     // Diffusion term
                     + (alpha_m_iter[i + 1] * k_m[i + 1] + 2 * alpha_m_iter[i] * k_m[i] + alpha_m_iter[i - 1] * k_m[i - 1]) / (2 * dz * dz)
@@ -1190,17 +1190,17 @@ int main() {
 
                 Q[i][2] = 0.0
 
-                    // Temporal term (cross terms version)
-                    + (alpha_m_iter[i] * cp_m_old[i] * T_m_iter[i] * rho_m_old[i]) / dt
-                    + (alpha_m_iter[i] * cp_m_old[i] * T_m_old[i] * rho_m_iter[i]) / dt
-                    + (alpha_m_old[i] * cp_m_old[i] * T_m_iter[i] * rho_m_iter[i]) / dt
+                    // Temporal term
+                    + (alpha_m_iter[i] * rho_m_iter[i] * cp_m[i] * T_m_old[i]) / dt
+                    + (ag + cp_m[i] * T_m_iter[i]) * alpha_m_old[i] * rho_m_old[i] / dt
+                    + (ag + cp_m[i] * T_m_iter[i]) * alpha_m_iter[i] * rho_m_iter[i] / dt
 
                     // Convective term
                     + 3 * (
-                        + alpha_m_iter[i] * rho_m_iter[i] * cp_m[i] * T_m_iter[i] * v_m_iter[i + 1] * H(v_m_iter[i + 1])
-                        + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cp_m[i + 1] * T_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))
-                        - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * cp_m[i - 1] * T_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])
-                        - alpha_m_iter[i] * rho_m_iter[i] * cp_m[i] * T_m_iter[i] * v_m_iter[i] * (1 - H(v_m_iter[i]))
+                        + alpha_m_iter[i] * rho_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) * v_m_iter[i + 1] * H(v_m_iter[i + 1])
+                        + alpha_m_iter[i + 1] * rho_m_iter[i + 1] * (ag + cp_m[i + 1] * T_m_iter[i + 1]) * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))
+                        - alpha_m_iter[i - 1] * rho_m_iter[i - 1] * (ag + cp_m[i - 1] * T_m_iter[i - 1]) * v_m_iter[i] * H(v_m_iter[i])
+                        - alpha_m_iter[i] * rho_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) * v_m_iter[i] * (1 - H(v_m_iter[i]))
                         ) / dz
 
                     // Pressure I term
@@ -1218,13 +1218,13 @@ int main() {
                 add(L[i], 2, 0, 0.0
 
                     // Convective term
-                    - (alpha_m_iter[i - 1] * cp_m[i - 1] * T_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])) / dz
+                    - (alpha_m_iter[i - 1] * (ag + cp_m[i - 1] * T_m_iter[i - 1]) * v_m_iter[i] * H(v_m_iter[i])) / dz
                 );
 
                 add(L[i], 2, 2, 0.0
 
                     // Convective term
-                    - (rho_m_iter[i - 1] * cp_m[i - 1] * T_m_iter[i - 1] * v_m_iter[i] * H(v_m_iter[i])) / dz
+                    - (rho_m_iter[i - 1] * (ag + cp_m[i - 1] * T_m_iter[i - 1]) * v_m_iter[i] * H(v_m_iter[i])) / dz
 
                     // Pressure I term
                     - p_m_iter[i] * (v_m_iter[i]) / (2 * dz)
@@ -1242,13 +1242,13 @@ int main() {
                 add(R[i], 2, 0, 0.0
 
                     // Convective term
-                    + (alpha_m_iter[i + 1] * cp_m[i + 1] * T_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
+                    + (alpha_m_iter[i + 1] * (ag + cp_m[i + 1] * T_m_iter[i + 1]) * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
                 );
 
                 add(R[i], 2, 2, 0.0
 
                     // Convective term
-                    + (rho_m_iter[i + 1] * cp_m[i + 1] * T_m_iter[i + 1] * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
+                    + (rho_m_iter[i + 1] * (ag + cp_m[i + 1] * T_m_iter[i + 1]) * v_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
 
                     // Pressure I term
                     + p_m_iter[i] * (v_m_iter[i + 1]) / (2 * dz)
@@ -1260,8 +1260,8 @@ int main() {
                     + p_m_iter[i] * (alpha_m_iter[i] + alpha_m_iter[i - 1]) / (2 * dz)
 
                     // Convective term
-                    + (alpha_m_iter[i] * rho_m_iter[i] * cp_m[i] * T_m_iter[i] * H(v_m_iter[i + 1])) / dz
-                    + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * cp_m[i + 1] * T_m_iter[i + 1] * (1 - H(v_m_iter[i + 1]))) / dz
+                    + (alpha_m_iter[i] * rho_m_iter[i] * (ag + cp_m[i] * T_m_iter[i]) * H(v_m_iter[i + 1])) / dz
+                    + (alpha_m_iter[i + 1] * rho_m_iter[i + 1] * (ag + cp_m[i + 1] * T_m_iter[i + 1]) * (1 - H(v_m_iter[i + 1]))) / dz
                 );
 
                 add(R[i], 2, 8, 0.0
@@ -1278,21 +1278,21 @@ int main() {
                 add(D[i], 3, 1, 0.0
 
                     // Temporal term
-                    + eps_v * (alpha_l_iter[i] * cp_l[i] * T_l_iter[i]) / dt
+                    + eps_v * alpha_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) / dt
 
                     // Convective term
-                    + eps_v * (alpha_l_iter[i] * cp_l[i] * T_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
-                    - eps_v * (alpha_l_iter[i] * cp_l[i] * T_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
+                    + eps_v * (alpha_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
+                    - eps_v * (alpha_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
                 );
 
                 add(D[i], 3, 3, 0.0
 
                     // Temporal term
-                    + eps_v * (T_l_iter[i] * rho_l_iter[i] * cp_l[i]) / dt
+                    + eps_v * rho_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) / dt
 
                     // Convective term
-                    + eps_v * (rho_l_iter[i] * cp_l[i] * T_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
-                    - eps_v * (rho_l_iter[i] * cp_l[i] * T_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
+                    + eps_v * (rho_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
+                    - eps_v * (rho_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
                     + eps_v * p_l_iter[i] * (v_l_iter[i + 1] - v_l_iter[i]) / (2 * dz)
@@ -1312,8 +1312,8 @@ int main() {
                 add(D[i], 3, 7, 0.0
 
                     // Convective term
-                    - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l[i - 1] * T_l_iter[i - 1] * H(v_l_iter[i])) / dz
-                    - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l[i] * T_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
+                    - eps_v * (alpha_l_iter[i - 1] * rho_l_iter[i - 1] * (al + cp_l[i - 1] * T_l_iter[i - 1]) * H(v_l_iter[i])) / dz
+                    - eps_v * (alpha_l_iter[i] * rho_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * (1 - H(v_l_iter[i]))) / dz
 
                     // Pressure I term
                     - eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
@@ -1330,7 +1330,7 @@ int main() {
                 add(D[i], 3, 9, 0.0
 
                     // Temporal term
-                    + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l[i]) / dt
+                    + eps_v * alpha_l_iter[i] * rho_l_iter[i] * cp_l[i] / dt
 
                     // Diffusion term
                     + eps_v * (alpha_l_iter[i + 1] * k_l[i + 1] + 2 * alpha_l_iter[i] * k_l[i] + alpha_l_iter[i - 1] * k_l[i - 1]) / (2 * dz * dz)
@@ -1356,16 +1356,16 @@ int main() {
                 Q[i][3] = 0.0
 
                     // Temporal term (cross terms)
-                    + eps_v * (alpha_l_iter[i] * cp_l[i] * T_l_iter[i] * rho_l_old[i]) / dt
-                    + eps_v * (alpha_l_iter[i] * cp_l[i] * T_l_old[i] * rho_l_iter[i]) / dt
-                    + eps_v * (alpha_l_old[i] * cp_l[i] * T_l_iter[i] * rho_l_iter[i]) / dt
+                    + eps_v * alpha_l_iter[i] * rho_l_iter[i] * cp_l[i] * T_l_old[i] / dt
+                    + eps_v * (al + cp_l[i] * T_l_iter[i]) * alpha_l_old[i] * rho_l_old[i] / dt
+                    + eps_v * (al + cp_l[i] * T_l_iter[i]) * alpha_l_iter[i] * rho_l_iter[i] / dt
 
                     // Convective term
                     + 3 * eps_v * (
-                        + alpha_l_iter[i] * rho_l_iter[i] * cp_l[i] * T_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1])
-                        + alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l[i +1] * T_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))
-                        - alpha_l_iter[i - 1] * rho_l_iter[i - 1] * cp_l[i - 1] * T_l_iter[i - 1] * v_l_iter[i] * H(v_l_iter[i])
-                        - alpha_l_iter[i] * rho_l_iter[i] * cp_l[i] * T_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i]))
+                        + alpha_l_iter[i] * rho_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * v_l_iter[i + 1] * H(v_l_iter[i + 1])
+                        + alpha_l_iter[i + 1] * rho_l_iter[i + 1] * (al + cp_l[i + 1] * T_l_iter[i + 1]) * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))
+                        - alpha_l_iter[i - 1] * rho_l_iter[i - 1] * (al + cp_l[i - 1] * T_l_iter[i - 1]) * v_l_iter[i] * H(v_l_iter[i])
+                        - alpha_l_iter[i] * rho_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * v_l_iter[i] * (1 - H(v_l_iter[i]))
                         ) / dz
 
                     // Pressure I term
@@ -1384,13 +1384,13 @@ int main() {
                 add(L[i], 3, 1, 0.0
 
                     // Convective term
-                    - eps_v * (alpha_l_iter[i - 1] * cp_l[i - 1] * T_l_iter[i - 1] * v_l_iter[i] * H(v_l_iter[i])) / dz
+                    - eps_v * (alpha_l_iter[i - 1] * (al + cp_l[i - 1] * T_l_iter[i - 1]) * v_l_iter[i] * H(v_l_iter[i])) / dz
                 );
 
                 add(L[i], 3, 3, 0.0
 
                     // Convective term
-                    - eps_v * (rho_l_iter[i - 1] * cp_l[i - 1] * T_l_iter[i - 1] * v_l_iter[i] * H(v_l_iter[i])) / dz
+                    - eps_v * (rho_l_iter[i - 1] * (al + cp_l[i - 1] * T_l_iter[i - 1]) * v_l_iter[i] * H(v_l_iter[i])) / dz
 
                     // Pressure I term
                     - eps_v * p_l_iter[i] * (v_l_iter[i]) / (2 * dz)
@@ -1408,13 +1408,13 @@ int main() {
                 add(R[i], 3, 1, 0.0
 
                     // Convective term
-                    + eps_v * (alpha_l_iter[i + 1] * cp_l[i +1] * T_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
+                    + eps_v * (alpha_l_iter[i + 1] * (al + cp_l[i + 1] * T_l_iter[i + 1]) * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
                 );
 
                 add(R[i], 3, 3, 0.0
 
                     // Convective term
-                    + eps_v * (rho_l_iter[i + 1] * cp_l[i +1] * T_l_iter[i + 1] * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
+                    + eps_v * (rho_l_iter[i + 1] * (al + cp_l[i + 1] * T_l_iter[i + 1]) * v_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
 
                     // Pressure I term
                     + eps_v * p_l_iter[i] * (v_l_iter[i + 1]) / (2 * dz)
@@ -1426,8 +1426,8 @@ int main() {
                     + eps_v * p_l_iter[i] * (alpha_l_iter[i] + alpha_l_iter[i + 1]) / (2 * dz)
 
                     // Convective term
-                    + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * cp_l[i] * T_l_iter[i] * H(v_l_iter[i + 1])) / dz
-                    + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * cp_l[i +1] * T_l_iter[i + 1] * (1 - H(v_l_iter[i + 1]))) / dz
+                    + eps_v * (alpha_l_iter[i] * rho_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * H(v_l_iter[i + 1])) / dz
+                    + eps_v * (alpha_l_iter[i + 1] * rho_l_iter[i + 1] * (al + cp_l[i + 1] * T_l_iter[i + 1]) * (1 - H(v_l_iter[i + 1]))) / dz
                 );
 
                 add(R[i], 3, 9, 0.0
@@ -1959,7 +1959,7 @@ int main() {
             double alpha = 1.0;
 
             // Update vectors from X
-            for (int i = 0; i < N; ++i) {
+            for (int i = 1; i < N - 1; ++i) {
 
                 rho_m[i] = alpha * X[i][0] + (1 - alpha) * rho_m_iter[i];
                 rho_l[i] = alpha * X[i][1] + (1 - alpha) * rho_l_iter[i];
