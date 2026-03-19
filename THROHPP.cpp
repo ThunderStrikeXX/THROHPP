@@ -18,6 +18,57 @@
 #include "vapor_sodium.h"
 #include "solver.h"
 
+void enforcingBCs(
+    std::vector<double>& rho_m,
+    std::vector<double>& rho_l,
+    std::vector<double>& alpha_m,
+    std::vector<double>& alpha_l,
+    std::vector<double>& p_m,
+    std::vector<double>& p_l,
+    std::vector<double>& v_m,
+    std::vector<double>& v_l,
+    std::vector<double>& T_m,
+    std::vector<double>& T_l,
+    std::vector<double>& T_w
+) {
+    rho_m[0] = rho_m[1];
+    rho_m[rho_m.size() - 1] = rho_m[rho_m.size() - 2];
+
+    rho_l[0] = rho_l[1];
+    rho_l[rho_m.size() - 1] = rho_l[rho_m.size() - 2];
+
+    alpha_m[0] = alpha_m[1];
+    alpha_m[alpha_m.size() - 1] = alpha_m[alpha_m.size() - 2];
+
+    alpha_l[0] = alpha_l[1];
+    alpha_l[alpha_l.size() - 1] = alpha_l[alpha_l.size() - 2];
+
+    p_m[0] = p_m[1];
+    p_m[p_m.size() - 1] = p_m[p_m.size() - 2];
+
+    p_l[0] = p_l[1];
+    p_l[p_l.size() - 1] = p_l[p_l.size() - 2];
+
+    v_m[0] = 0.0;
+    v_m[1] = 0.0;
+    v_m[v_m.size() - 1] = 0.0;
+    v_m[v_m.size() - 2] = 0.0;
+
+    v_l[0] = 0.0;
+    v_l[1] = 0.0;
+    v_l[v_l.size() - 1] = 0.0;
+    v_l[v_l.size() - 2] = 0.0;
+
+    T_m[0] = T_m[1];
+    T_m[T_m.size() - 1] = T_m[T_m.size() - 2];
+
+    T_l[0] = T_l[1];
+    T_l[T_l.size() - 1] = T_l[T_l.size() - 2];
+
+    T_w[0] = T_w[1];
+    T_w[T_w.size() - 1] = T_w[T_w.size() - 2];
+}
+
 int main() {
 
     // =======================================================================
@@ -568,6 +619,11 @@ int main() {
 
     std::cout << "Case: " << name << std::endl;
 
+    // Enforcing boundary conditions
+    enforcingBCs(rho_m, rho_l, alpha_m, alpha_l, p_m, p_l, v_m, v_l, T_m, T_l, T_w);
+    enforcingBCs(rho_m_iter, rho_l_iter, alpha_m_iter, alpha_l_iter, p_m_iter, p_l_iter, v_m_iter, v_l_iter, T_m_iter, T_l_iter, T_w_iter);
+    enforcingBCs(rho_m_old, rho_l_old, alpha_m_old, alpha_l_old, p_m_old, p_l_old, v_m_old, v_l_old, T_m_old, T_l_old, T_w_old);
+
     // Start computational time measurement of whole simulation
     auto t_start_simulation = std::chrono::high_resolution_clock::now();
 
@@ -653,44 +709,6 @@ int main() {
                 D[i].row.clear(); D[i].col.clear(); D[i].val.clear();
                 R[i].row.clear(); R[i].col.clear(); R[i].val.clear();
             }
-
-            // Forcing boundary conditions
-
-            v_m_iter[0] = 0.0;   // BC ingresso
-            v_m_iter[N] = 0.0;   // BC uscita
-
-            v_l_iter[0] = 0.0;
-            v_l_iter[N] = 0.0;
-
-            v_m[0] = 0.0;   // BC ingresso
-            v_m[N] = 0.0;   // BC uscita
-
-            v_l[0] = 0.0;
-            v_l[N] = 0.0;
-
-            T_m_iter[0] = T_m_iter[1];
-            T_l_iter[0] = T_l_iter[1];
-
-            T_m_iter[N - 1] = T_m_iter[N - 2];
-            T_l_iter[N - 1] = T_l_iter[N - 2];
-
-            alpha_m_iter[0] = alpha_m_iter[1];
-            alpha_l_iter[0] = alpha_l_iter[1];
-
-            alpha_m_iter[N - 1] = alpha_m_iter[N - 2];
-            alpha_l_iter[N - 1] = alpha_l_iter[N - 2];
-
-            rho_m_iter[0] = rho_m_iter[1];
-            rho_l_iter[0] = rho_l_iter[1];
-
-            rho_m_iter[N - 1] = rho_m_iter[N - 2];
-            rho_l_iter[N - 1] = rho_l_iter[N - 2];
-
-            p_m_iter[0] = p_m_iter[1];
-            p_l_iter[0] = p_l_iter[1];
-
-            p_m_iter[N - 1] = p_m_iter[N - 2];
-            p_l_iter[N - 1] = p_l_iter[N - 2];
 
             // Space discretization loop
             for (int i = 1; i < N - 1; ++i) {
@@ -1852,6 +1870,11 @@ int main() {
 
             solve_block_tridiag(L, D, R, Q, X);
 
+            // Enforcing boundary conditions
+            enforcingBCs(rho_m, rho_l, alpha_m, alpha_l, p_m, p_l, v_m, v_l, T_m, T_l, T_w);
+            enforcingBCs(rho_m_iter, rho_l_iter, alpha_m_iter, alpha_l_iter, p_m_iter, p_l_iter, v_m_iter, v_l_iter, T_m_iter, T_l_iter, T_w_iter);
+            enforcingBCs(rho_m_old, rho_l_old, alpha_m_old, alpha_l_old, p_m_old, p_l_old, v_m_old, v_l_old, T_m_old, T_l_old, T_w_old);
+
             // Calculate Picard error
             L_pic = {};
 
@@ -2559,26 +2582,27 @@ int main() {
                 Gamma_xv_lin_error_output.flush();
                 Gamma_xv_diff_error_output.flush();
 
-                rho_m_old = rho_m;
-                rho_l_old = rho_l;
-                alpha_m_old = alpha_m;
-                alpha_l_old = alpha_l;
-                p_m_old = p_m;
-                p_l_old = p_l;
-                v_m_old = v_m;
-                v_l_old = v_l;
-                T_m_old = T_m;
-                T_l_old = T_l;
-                T_w_old = T_w;
-
-                Gamma_xv_old = Gamma_xv;
-                T_sur_old = T_sur;
-
-                cp_l_old = cp_l;
-                cp_m_old = cp_m;
-
                 t_last_print += print_interval;
             }
+
+            rho_m_old = rho_m;
+            rho_l_old = rho_l;
+            alpha_m_old = alpha_m;
+            alpha_l_old = alpha_l;
+            p_m_old = p_m;
+            p_l_old = p_l;
+            v_m_old = v_m;
+            v_l_old = v_l;
+            T_m_old = T_m;
+            T_l_old = T_l;
+            T_w_old = T_w;
+
+            Gamma_xv_old = Gamma_xv;
+            T_sur_old = T_sur;
+
+            cp_l_old = cp_l;
+            cp_m_old = cp_m;
+
         }
         else {
 
