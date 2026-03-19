@@ -2,15 +2,15 @@
 
 namespace vapor_sodium {
 
-    constexpr double ag = 4.683166e6;   // J/kg
-    constexpr double bg = 3.589755e2;   // J/(kg·K)
+    constexpr double ag = 0.0;                     // ag - h_ref = 0
+    constexpr double bg = 3.589755e2;              // invariato J/(kg·K)
 
     const double Rv = 361.65;
 
     // From h_g(T) = ag + bg * T
     inline double cp_g_linear() {
 
-        return 3.589755e2;   // J/(kg·K)
+        return bg;   // J/(kg·K)
     }
 
     inline double h_g_linear(double T) {
