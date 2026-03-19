@@ -146,7 +146,7 @@ int main() {
 
     // Printing parameters
     double t_last_print = 0.0;                          // Time from last print [s]
-    const double print_interval = 1e-2;                 // Time interval for printing [s]
+    const double print_interval = 0.5;                 // Time interval for printing [s]
 
     // Picard loops parameters	          
     int pic = 0;                                        // Number of Picard iterations [-]
@@ -246,12 +246,12 @@ int main() {
     }
 
 
-    int n_evap = 0;
     double sum_w = 0.0;
-    std::vector<double> w(N, 0.0);
+    int n_evap = 0;
 
-    // Evaporator cosine distribution
+    // Evaporator
     for (int i = 0; i < N; ++i) {
+        double w = 0.0;
 
         if (mesh[i] >= evaporator_start - delta_h &&
             mesh[i] <= evaporator_end + delta_h) {
@@ -262,22 +262,30 @@ int main() {
                 mesh[i] < evaporator_start) {
 
                 double x = (mesh[i] - (evaporator_start - delta_h)) / delta_h;
-                w[i] = 0.5 * (1.0 - std::cos(pi * x));
+                w = 0.5 * (1.0 - std::cos(pi * x));
             }
             else if (mesh[i] >= evaporator_start &&
                 mesh[i] <= evaporator_end) {
 
-                w[i] = 1.0;
+                w = 1.0;
             }
             else if (mesh[i] > evaporator_end &&
                 mesh[i] <= evaporator_end + delta_h) {
 
                 double x = (mesh[i] - evaporator_end) / delta_h;
-                w[i] = 0.5 * (1.0 + std::cos(pi * x));
+                w = 0.5 * (1.0 + std::cos(pi * x));
             }
         }
 
-        sum_w += w[i];
+        q_ow[i] = w;        // Evaporator weight
+        sum_w += w;
+    }
+
+    // Evaporator normalization 
+    const double s = (sum_w > 0.0) ? q0 / sum_w : 0.0;
+    for (int i = 0; i < N; ++i) {
+
+        q_ow[i] *= s;
     }
 
     // Old variables
@@ -411,9 +419,9 @@ int main() {
     std::vector<double> fm(N, 0.0);
     std::vector<double> fl(N, 0.0);
 
-    bool mass_sources = 1;
+    bool mass_sources = 0;
     bool heat_sources_xw = 1;
-    bool heat_sources_xv_mass = 1;
+    bool heat_sources_xv_mass = 0;
     bool heat_sources_xv_heat = 1;
     bool external_heat = 1;
 
@@ -664,11 +672,8 @@ int main() {
 
         }
 
-        const double s = (sum_w > 0.0) ? q0 / sum_w : 0.0;
-
+        // Condenser
         for (int i = 1; i < N - 2; ++i) {
-
-            q_ow[i] = w[i] * s;
 
             double conv = h_conv * (T_w[i] - T_env);                                        // [W/m2]
             double irr = emissivity * sigma * (std::pow(T_w[i], 4) - std::pow(T_env, 4));   // [W/m2]
@@ -2159,7 +2164,7 @@ int main() {
 
                     gamma_output << Gamma_xv[i] * (pi * r_i * r_i * dz) << " ";
 
-                    power_flux_ow_output << q_ow[i] * (2 * pi * r_o * dz) << " ";
+                    power_flux_ow_output << q_ow[i] * 2 * r_o * evaporator_length_eff * pi << " ";
 
                     power_flux_wx_output << power_flux_wx[i] << " ";
                     power_flux_xw_output << power_flux_xw[i] << " ";
@@ -2398,7 +2403,7 @@ int main() {
                 
                     // Check total external heat sources
 
-                    global_energy_balance += q_ow[i] * (2 * pi * r_o * dz);       
+                    global_energy_balance += q_ow[i] * (2 * pi * r_o * evaporator_length) / dz;
                 }
 
                 // --------- Differences
