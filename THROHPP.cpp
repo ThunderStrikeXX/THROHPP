@@ -18,6 +18,9 @@
 #include "vapor_sodium.h"
 #include "solver.h"
 
+namespace liquid = liquid_sodium;
+namespace vapor = vapor_sodium;
+
 void enforcingBCs(
     std::vector<double>& rho_m,
     std::vector<double>& rho_l,
@@ -85,7 +88,7 @@ int main() {
     // Physical properties
     const double emissivity = 0.5;           // Wall emissivity [-]
     const double sigma = 5.67e-8;            // Stefan-Boltzmann constant [W/(m2K4)]
-    const double Rv = 361.5;                 // Gas constant for the sodium vapor [J/(kgK)]
+    const double Rv = vapor::Rv;                 // Gas constant for the sodium vapor [J/(kgK)]
 
     // Evaporation and condensation parameters
     const double eps_s = 1.0;                // Surface fraction of the liquid available for phasic interface [-]
@@ -150,21 +153,21 @@ int main() {
 
     // Picard loops parameters	          
     int pic = 0;                                        // Number of Picard iterations [-]
-    const int max_picard = 10;                         // Maximum number of Picard iterations per timestep [-]
+    const int max_picard = 50;                         // Maximum number of Picard iterations per timestep [-]
     std::array<double, B> L_pic;                        // Picard residuals [-]
     std::array<bool, B> conv_var;                       // Bool array if parameter converged or not [-]
     std::array<double, B> pic_tol = {                   // Tolerance for the convergence of Picard loop [-]
-        1e-8,  // rho_m
-        1e-8,  // rho_l
-        1e-8,  // alpha_m
-        1e-8,  // alpha_l
-        1e-8,  // p_m
-        1e-8,  // p_l
-        1e-8,  // v_m
-        50,  // v_l
-        50,  // T_m
-        1e-8,  // T_l
-        1e-8   // T_w
+        1e-6,  // rho_m
+        1e-6,  // rho_l
+        1e-6,  // alpha_m
+        1e-6,  // alpha_l
+        1e-6,  // p_m
+        1e-6,  // p_l
+        1,  // v_m
+        1,  // v_l
+        1e-6,  // T_m
+        1e-6,  // T_l
+        1e-6   // T_w
     };
 
     // Mesh z positions
@@ -226,11 +229,11 @@ int main() {
 
         T_sur[i] = T_left + s * (T_right - T_left);
 
-        p_m[i] = vapor_sodium::P_sat(T_sur[i]);
+        p_m[i] = vapor::P_sat(T_sur[i]);
         p_l[i] = p_m[i];
 
         rho_m[i] = p_m[i] / (T_m[i] * Rv);
-        rho_l[i] = liquid_sodium::rho(T_l[i]);
+        rho_l[i] = liquid::rho(T_l[i]);
 
         // alpha_m[i] = 0.95 - 0.35 * s;   // 0.95 → 0.60
         // alpha_l[i] = 1.0 - alpha_m[i];  // 0.05 → 0.40
@@ -241,8 +244,8 @@ int main() {
 
     for (int i = 2; i < N - 1; i++) {
 
-        v_m[i] = 1.0;
-        v_l[i] = -0.1;
+        v_m[i] = 10.0;
+        v_l[i] = -0.0001;
     }
 
 
@@ -393,10 +396,10 @@ int main() {
 
     // ------ Properties
 
-    std::vector<double> cp_m(N, vapor_sodium::cp_g_linear());
+    std::vector<double> cp_m(N, vapor::cp_g_linear());
     std::vector<double> cp_m_old = cp_m;
 
-    std::vector<double> cp_l(N, liquid_sodium::cp_l_linear());
+    std::vector<double> cp_l(N, liquid::cp_l_linear());
     std::vector<double> cp_l_old = cp_l;
 
     std::vector<double> cp_w(N);
@@ -419,7 +422,7 @@ int main() {
     std::vector<double> fm(N, 0.0);
     std::vector<double> fl(N, 0.0);
 
-    bool mass_sources = 1;
+    bool mass_sources = 0;
     bool heat_sources_xw = 1;
     bool heat_sources_xv_mass = 0;
     bool heat_sources_xv_heat = 1;
@@ -625,6 +628,13 @@ int main() {
 
     double beta = 0.0;
 
+    // Enthalpy roperties
+    const double ag = vapor::ag;   // J/kg
+    const double bg = vapor::bg;     // J/(kg·K) = cp_g
+
+    const double al = liquid::al;   // J/kg  
+    const double bl = liquid::bl;     // J/(kg·K) = cp_l
+
     std::cout << "Case: " << name << std::endl;
 
     // Enforcing boundary conditions
@@ -662,13 +672,13 @@ int main() {
             rho_w[i] = steel::rho(T_w[i]);
             k_w[i] = steel::k(T_w[i]);
 
-            cp_l[i] = liquid_sodium::cp_l_linear();
-            k_l[i] = liquid_sodium::k(T_l[i]);
-            mu_l[i] = liquid_sodium::mu(T_l[i]);
+            cp_l[i] = liquid::cp_l_linear();
+            k_l[i] = liquid::k(T_l[i]);
+            mu_l[i] = liquid::mu(T_l[i]);
 
-            cp_m[i] = vapor_sodium::cp_g_linear();
-            k_m[i] = vapor_sodium::k(T_m[i], p_m[i]);
-            mu_m[i] = liquid_sodium::mu(T_m[i]);
+            cp_m[i] = vapor::cp_g_linear();
+            k_m[i] = vapor::k(T_m[i], p_m[i]);
+            mu_m[i] = liquid::mu(T_m[i]);
 
         }
 
@@ -729,9 +739,9 @@ int main() {
                 // Physical properties
                 Re_v[i] = rho_m_iter[i] * std::fabs(v_m_iter[i]) * Dh_v / mu_m[i];              // Reynolds number [-]
                 Pr_v[i] = cp_m[i] * mu_m[i] / k_m[i];                                                 // Prandtl number [-] 
-                H_xm[i] = vapor_sodium::h_conv(Re_v[i], Pr_v[i], k_m[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
-                p_saturation[i] = vapor_sodium::P_sat(T_sur_iter[i]);                           // Saturation pressure [Pa]         
-                dPsat_dT[i] = vapor_sodium::dP_sat_dT(T_sur_iter[i]);                           // Derivative of the saturation pressure wrt T [Pa/K]   
+                H_xm[i] = vapor::h_conv(Re_v[i], Pr_v[i], k_m[i], Dh_v);     // Convective heat transfer coefficient at the vapor-wick interface [W/m^2/K]
+                p_saturation[i] = vapor::P_sat(T_sur_iter[i]);                           // Saturation pressure [Pa]         
+                dPsat_dT[i] = vapor::dP_sat_dT(T_sur_iter[i]);                           // Derivative of the saturation pressure wrt T [Pa/K]   
 
                 // Gamma coefficients definition (everything is calculated using iter (k-iteration) values)
 
@@ -745,16 +755,16 @@ int main() {
                 if (Gamma_xv_iter[i] >= 0.0) {
 
                     // Evaporation case
-                    h_xv_v = vapor_sodium::h_g_linear(T_sur_iter[i]);
-                    h_vx_x = liquid_sodium::h_l_linear(T_sur_iter[i]);
+                    h_xv_v = vapor::h_g_linear(T_sur_iter[i]);
+                    h_vx_x = liquid::h_l_linear(T_sur_iter[i]);
 
                 }
                 else {
                      
                     // Condensation case
-                    h_xv_v = vapor_sodium::h_g_linear(T_m_iter[i]);
-                    h_vx_x = liquid_sodium::h_l_linear(T_sur_iter[i])
-                        + (vapor_sodium::h_g_linear(T_m_iter[i]) - vapor_sodium::h_g_linear(T_sur_iter[i]));
+                    h_xv_v = vapor::h_g_linear(T_m_iter[i]);
+                    h_vx_x = liquid::h_l_linear(T_sur_iter[i])
+                        + (vapor::h_g_linear(T_m_iter[i]) - vapor::h_g_linear(T_sur_iter[i]));
                 }
 
                 Dh[i] = h_xv_v - h_vx_x;
@@ -883,7 +893,7 @@ int main() {
                 // DPcap evaluation
                 const double alpha_m0 = r_v * r_v / (r_i * r_i);                        // Nominal vapor volume fraction (when r_c = infty) [-]
                 const double r_p = 1e-5;                                                // Porosity radius [m]
-                const double surf_ten_value = vapor_sodium::surf_ten(T_l_iter[i]);      // Surface tension [N/m]           
+                const double surf_ten_value = vapor::surf_ten(T_l_iter[i]);      // Surface tension [N/m]           
 
                 const double Lambda = 3 * r_v * (alpha_m_iter[i] - alpha_m0) / (2 * alpha_m0 * eps_s * r_p);
 
@@ -1288,8 +1298,8 @@ int main() {
                     + eps_v * (alpha_l_iter[i] * cp_l[i] * T_l_iter[i]) / dt
 
                     // Convective term
-                    + eps_v * (alpha_l_iter[i] * cp_l[i] * T_l_iter[i] * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
-                    - eps_v * (alpha_l_iter[i] * cp_l[i] * T_l_iter[i] * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
+                    + eps_v * (alpha_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * v_l_iter[i + 1] * H(v_l_iter[i + 1])) / dz
+                    - eps_v * (alpha_l_iter[i] * (al + cp_l[i] * T_l_iter[i]) * v_l_iter[i] * (1 - H(v_l_iter[i]))) / dz
                 );
 
                 add(D[i], 3, 3, 0.0
@@ -1880,94 +1890,6 @@ int main() {
             enforcingBCs(rho_m_iter, rho_l_iter, alpha_m_iter, alpha_l_iter, p_m_iter, p_l_iter, v_m_iter, v_l_iter, T_m_iter, T_l_iter, T_w_iter);
             enforcingBCs(rho_m_old, rho_l_old, alpha_m_old, alpha_l_old, p_m_old, p_l_old, v_m_old, v_l_old, T_m_old, T_l_old, T_w_old);
 
-            // Calculate Picard error
-            L_pic = {};
-
-            double Aold, Anew, denom, eps;
-
-            for (int i = 1; i < N - 1; ++i) {
-
-                // rho_m
-                Aold = rho_m_iter[i];
-                Anew = X[i][0];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[0] += eps;
-
-                // rho_l
-                Aold = rho_l_iter[i];
-                Anew = X[i][1];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[1] += eps;
-
-                // alpha_m
-                Aold = alpha_m_iter[i];
-                Anew = X[i][2];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[2] += eps;
-
-                // alpha_l
-                Aold = alpha_l_iter[i];
-                Anew = X[i][3];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[3] += eps;
-
-                // p_m
-                Aold = p_m_iter[i];
-                Anew = X[i][4];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[4] += eps;
-
-                // p_l
-                Aold = p_l_iter[i];
-                Anew = X[i][5];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[5] += eps;
-
-                // v_m
-                Aold = v_m_iter[i];
-                Anew = X[i][6];
-                denom = std::max({ std::abs(Aold), std::abs(Anew), 1e-3 });
-                eps = std::abs(Anew - Aold) / denom;
-                L_pic[6] = std::max(L_pic[6], eps);
-
-                // v_l
-                Aold = v_l_iter[i];
-                Anew = X[i][7];
-                denom = std::max({ std::abs(Aold), std::abs(Anew), 1e-5 });
-                eps = std::abs(Anew - Aold) / denom;
-                L_pic[7] = std::max(L_pic[7], eps);
-
-                // T_m
-                Aold = T_m_iter[i];
-                Anew = X[i][8];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[8] += eps;
-
-                // T_l
-                Aold = T_l_iter[i];
-                Anew = X[i][9];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[9] += eps;
-
-                // T_w
-                Aold = T_w_iter[i];
-                Anew = X[i][10];
-                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
-                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
-                L_pic[10] += eps;
-            }
-
-            for (int k = 0; k < B; ++k)
-                L_pic[k] /= N;
-
             double alpha = 1.0;
 
             // Update vectors from X
@@ -1986,12 +1908,103 @@ int main() {
                 T_w[i] = alpha * X[i][10] + (1 - alpha) * T_w_iter[i];
 
                 T_sur[i] = alpha * (C31[i] * p_m[i] + C32[i] * T_m[i] + C33[i] * T_l[i] + C34[i] * T_w[i] + C35[i]) + (1 - alpha) * T_sur_iter[i];
-                Gamma_xv[i] = alpha * (Kgeom * beta * (sigma_e * vapor_sodium::P_sat(T_sur[i]) - sigma_c * p_m[i])) + (1 - alpha) * Gamma_xv_iter[i];
+                Gamma_xv[i] = alpha * (Kgeom * beta * (sigma_e * vapor::P_sat(T_sur[i]) - sigma_c * p_m[i])) + (1 - alpha) * Gamma_xv_iter[i];
             }
 
             // Ghost cells
             Gamma_xv[0] = 0.0;
             Gamma_xv[N - 1] = 0.0;
+
+            T_sur[0] = T_sur[1];
+            T_sur[N - 1] = T_sur[N - 2];
+
+            // Calculate Picard error
+            L_pic = {};
+
+            double Aold, Anew, denom, eps;
+
+            for (int i = 1; i < N - 1; ++i) {
+
+                // rho_m
+                Aold = rho_m_iter[i];
+                Anew = rho_m[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[0] += eps;
+
+                // rho_l
+                Aold = rho_l_iter[i];
+                Anew = rho_l[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[1] += eps;
+
+                // alpha_m
+                Aold = alpha_m_iter[i];
+                Anew = alpha_m[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[2] += eps;
+
+                // alpha_l
+                Aold = alpha_l_iter[i];
+                Anew = alpha_l[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[3] += eps;
+
+                // p_m
+                Aold = p_m_iter[i];
+                Anew = p_m[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[4] += eps;
+
+                // p_l
+                Aold = p_l_iter[i];
+                Anew = p_l[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[5] += eps;
+
+                // v_m
+                Aold = v_m_iter[i];
+                Anew = v_m[i];
+                denom = std::max({ std::abs(Aold), std::abs(Anew), 1e-3 });
+                eps = std::abs(Anew - Aold) / denom;
+                L_pic[6] = std::max(L_pic[6], eps);
+
+                // v_l
+                Aold = v_l_iter[i];
+                Anew = v_l[i];
+                denom = std::max({ std::abs(Aold), std::abs(Anew), 1e-5 });
+                eps = std::abs(Anew - Aold) / denom;
+                L_pic[7] = std::max(L_pic[7], eps);
+
+                // T_m
+                Aold = T_m_iter[i];
+                Anew = T_m[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[8] += eps;
+
+                // T_l
+                Aold = T_l_iter[i];
+                Anew = T_l[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[9] += eps;
+
+                // T_w
+                Aold = T_w_iter[i];
+                Anew = T_w[i];
+                denom = 0.5 * (std::abs(Aold) + std::abs(Anew));
+                eps = denom > 1e-12 ? std::abs((Anew - Aold) / denom) : std::abs(Anew - Aold);
+                L_pic[10] += eps;
+            }
+
+            for (int k = 0; k < B; ++k)
+                L_pic[k] /= N;
 
             bool found_nan = false;
 

@@ -2,6 +2,9 @@
 
 namespace liquid_sodium {
 
+    constexpr double al = -2.359582e5;   // J/kg
+    constexpr double bl = 1.256230e3;    // J/(kg·K)
+
     // Critical temperature [K]
     constexpr double Tcrit = 2509.46;
 
@@ -42,18 +45,10 @@ namespace liquid_sodium {
     }
 
     inline double h_l_linear(double T) {
-
-        constexpr double al = -2.359582e5;   // J/kg
-        constexpr double bl = 1.256230e3;    // J/(kg·K)
-
         return al + bl * T;                     // J/kg
     }
 
     inline double T_from_h_l_linear(double h) {
-
-        constexpr double al = -2.359582e5;   // J/kg
-        constexpr double bl = 1.256230e3;    // J/(kg·K)
-
         return (h - al) / bl;                   // K
     }
 }
