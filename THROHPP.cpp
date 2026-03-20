@@ -38,7 +38,7 @@ void enforcingBCs(
     rho_m[rho_m.size() - 1] = rho_m[rho_m.size() - 2];
 
     rho_l[0] = rho_l[1];
-    rho_l[rho_m.size() - 1] = rho_l[rho_m.size() - 2];
+    rho_l[rho_l.size() - 1] = rho_l[rho_l.size() - 2];
 
     alpha_m[0] = alpha_m[1];
     alpha_m[alpha_m.size() - 1] = alpha_m[alpha_m.size() - 2];
@@ -680,7 +680,7 @@ int main() {
 
             cp_m[i] = vapor::cp_g_linear();
             k_m[i] = vapor::k(T_m[i], p_m[i]);
-            mu_m[i] = liquid::mu(T_m[i]);
+            mu_m[i] = vapor::mu(T_m[i]);
 
         }
 
