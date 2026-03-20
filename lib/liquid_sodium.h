@@ -28,7 +28,7 @@ namespace liquid_sodium {
     */
     inline double k(double T) {
 
-        return 124.67 - 0.11381 * T + 5.5226e-5 * T * T - 1.1842e-8 * T * T * T;
+        return (124.67 - 0.11381 * T + 5.5226e-5 * T * T - 1.1842e-8 * T * T * T);
     }
 
     /**
